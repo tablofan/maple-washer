@@ -1,8 +1,9 @@
 # Maple Washer
 
-Maple Washer is a browser-based planner for HP/MP progression in MapleLegends. It translates a
-dense set of class formulas and game constraints into an executable, level-by-level plan while
-minimizing the number of AP Resets required.
+Maple Washer is a browser-based calculator and simulator for HP Washing, a MapleStory character
+progression mechanic, using the rules of the MapleLegends server. It translates a dense set of class
+formulas and game constraints into an executable, level-by-level plan while minimizing the number
+of AP Resets required.
 
 The project is a dependency-free JavaScript application. Its calculation engine is kept separate
 from the interface and exercised directly through a Node.js test suite.
