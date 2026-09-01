@@ -808,13 +808,15 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier) {
           // be empty — a non-zero rate would book fresh AP + resets on levels that don't exist.
           const maxFresh = mpWashStop >= goals.targetLevel ? 0 : 5;
           const maxStale = mpWashStop >= goals.targetLevel ? 0 : 5;
-          let settled = false;
-          for (let freshHPPerLevelPhase3 = maxFresh; freshHPPerLevelPhase3 >= 0 && !settled; freshHPPerLevelPhase3--) {
-            for (let staleHPPerLevelPhase3 = 0; staleHPPerLevelPhase3 <= maxStale && !settled; staleHPPerLevelPhase3++) {
+          // Search EVERY rate and let consider() keep the cheapest. A higher pairing rate is only
+          // worth paying for when it's the cheapest way to reach the HP Goal — when the goal is
+          // already met (or overshot), a lower rate is strictly cheaper, so settling on the highest
+          // feasible rate would spend resets on HP nobody asked for.
+          for (let freshHPPerLevelPhase3 = maxFresh; freshHPPerLevelPhase3 >= 0; freshHPPerLevelPhase3--) {
+            for (let staleHPPerLevelPhase3 = 0; staleHPPerLevelPhase3 <= maxStale; staleHPPerLevelPhase3++) {
               const r = evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier, {
                 targetBaseInt, mpWashStart, mpWashStop, shift, freshHPPerLevelPhase3, staleHPPerLevelPhase3,
               }, ranges, phase1Cache);
-              if (r.feasible && r.finalHP >= goals.hpGoal) settled = true;
               consider(r);
             }
           }
