@@ -104,12 +104,22 @@ function plan(opts) {
     currentState[classData.mainStat.toLowerCase()] = opts.current.mainStat;
   }
   delete currentState.mainStat;
-  const goals = Object.assign({ hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, opts.goals || {});
+  // Swap Level defaults to Target Level (the degenerate case where everything collapses at the
+  // goal level). Tests that exercise a realistic plan pass an explicit swapLevel.
+  const goals = Object.assign(
+    { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: null },
+    opts.goals || {}
+  );
+  if (goals.swapLevel === null) goals.swapLevel = goals.targetLevel;
   const gearInt = opts.gearInt ?? 40;
   const mwMultiplier = opts.mwMultiplier ?? 1.0;
   const r = optimize(classData, currentState, goals, gearInt, mwMultiplier);
-  // Stash the className back into the result for tests that need it.
-  if (r && r.params) r.params.className = opts.class;
+  // Stash the className / inputs back into the result for tests that need them.
+  if (r && r.params) {
+    r.params.className = opts.class;
+    r.__state = currentState;
+    r.__goals = goals;
+  }
   return r;
 }
 
@@ -118,7 +128,7 @@ function plan(opts) {
 
 describe('Reference cases (Krythan-aligned)', () => {
   test('Night Lord fresh start to 30k HP / 5k MP at lvl 180', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 } });
     assertFeasible(r);
     assertEq(r.finalHP, 30000, 'HP at cap');
     assertTrue(r.finalMP >= 5000, 'MP meets goal');
@@ -128,12 +138,16 @@ describe('Reference cases (Krythan-aligned)', () => {
   });
 
   test('Hero (Warrior) fresh start to 30k HP / 2k MP at lvl 180', () => {
-    const r = plan({ class: 'Hero', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180 } });
+    const r = plan({ class: 'Hero', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 } });
     assertFeasible(r);
     assertEq(r.finalHP, 30000);
     assertTrue(r.finalMP >= 2000);
-    // Warriors use fresh HP wash (52 HP/AP). Krythan's Warrior sheet gives ~470 resets.
-    assertInRange(r.apResets, 400, 550, 'Warrior AP Resets near Krythan default ~470');
+    // Warriors use fresh HP wash (52 HP/AP). Krythan's Warrior sheet gives ~470 resets, but that
+    // figure lets the optimizer pick its own MP-wash stop (his sheet stops around lvl 32 and
+    // fresh-washes the rest). Under ADR 0001 the Swap Level is a USER input, and fixing it at 120
+    // forces ~110 levels of MP wash before any fresh HP wash — correctly costing more (~980).
+    // Earlier swaps are cheaper for Warriors: swap 40 → ~600, swap 180 → ~1670.
+    assertInRange(r.apResets, 850, 1150, 'Warrior AP Resets at swap 120');
   });
 
   test('Magician fresh start to 5k HP / 10k MP at lvl 180', () => {
@@ -604,15 +618,17 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     }
   });
 
-  test('Stale HP Wash breakdown lumps Phase 3 stale + cleanup stale into one count', () => {
+  test('Stale HP Wash breakdown lumps Phase 3 stale + swap burst + cleanup stale into one count', () => {
     const r = plan({
       class: 'Night Lord',
-      goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
+      goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 },
     });
     assertFeasible(r);
     const phase3Stale = r.params.phase3StaleHPResets || 0;
+    const swapBurst = r.params.swapBurst || 0;
     const cleanupStale = r.params.cleanupStaleHPWash || 0;
-    assertEq(r.breakdown.staleHPWash, phase3Stale + cleanupStale, 'breakdown.staleHPWash = Phase 3 stale + cleanup stale');
+    assertEq(r.breakdown.staleHPWash, phase3Stale + swapBurst + cleanupStale,
+      'breakdown.staleHPWash = Phase 3 stale + swap burst + cleanup stale');
   });
 
   test('Invariant: apResets equals sum of all reset categories', () => {
@@ -699,6 +715,123 @@ describe('Per-class smoke tests (every class returns a sensible plan)', () => {
       assertTrue(r.finalHP <= 30000, 'never overshoots HP cap');
     });
   }
+});
+
+// ───────────────── Swap Level (ADR 0001) ─────────────────
+
+describe('Swap Level', () => {
+  const NL_START = { level: 40, hp: 1500, mp: 800, str: 4, dex: 4, luk: 45, baseInt: 180 };
+
+  test('Base INT collapses to its starting value AT the Swap Level, not at Target Level', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const preSwap = rows.find(x => x.level === 119);
+    const atSwap = rows.find(x => x.level === 120);
+    assertTrue(preSwap.baseInt > 4, 'Base INT is built up before the swap');
+    assertEq(atSwap.baseInt, 4, 'Base INT resets to starting value AT the swap level');
+  });
+
+  test('Main Stat absorbs Base INT at the Swap Level', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const preSwap = rows.find(x => x.level === 119);
+    const atSwap = rows.find(x => x.level === 120);
+    assertTrue(atSwap.mainStat > preSwap.mainStat, 'Main Stat jumps at the swap');
+    // The jump equals the INT that was flushed (plus that level's own -MP +LUK cycles).
+    assertTrue(atSwap.mainStat - preSwap.mainStat >= r.breakdown.intReset,
+      'Main Stat gain covers the flushed Base INT');
+  });
+
+  test('Level table carries a Main Stat column', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    assertTrue('mainStat' in rows[0], 'rows carry a mainStat field');
+    assertTrue(rows.every(x => Number.isFinite(x.mainStat)), 'mainStat is always numeric');
+  });
+
+  test('Swap burst front-loads HP at the swap level (free — total resets unchanged)', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    assertTrue(r.params.swapBurst > 0, 'a swap burst was scheduled');
+    assertTrue(r.params.hpAtSwap > 5000, 'HP at the swap level is substantial');
+  });
+
+  test('Swap Level == Target Level is valid and collapses everything at the goal level', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 200, swapLevel: 200 },
+    });
+    assertFeasible(r);
+    assertEq(r.params.mpWashStop, 200, 'MP wash runs to the target level');
+    assertTrue(r.finalHP >= 25000, 'HP goal still met');
+  });
+
+  test('Swap Level above Target Level is rejected', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 180, swapLevel: 200 },
+    });
+    assertEq(r.feasible, false, 'rejected');
+    assertTrue(/Swap Level/.test(r.reason), 'reason names the Swap Level');
+  });
+
+  test('Swap Level below Current Level is rejected', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: NL_START,
+      goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 200, swapLevel: 20 },
+    });
+    assertEq(r.feasible, false, 'rejected');
+    assertTrue(/Swap Level/.test(r.reason), 'reason names the Swap Level');
+  });
+
+  test('Earlier swaps are cheaper for Warriors (fresh HP wash dominates for them)', () => {
+    const early = plan({
+      class: 'Hero',
+      goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 80 },
+    });
+    const late = plan({
+      class: 'Hero',
+      goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 180 },
+    });
+    assertFeasible(early);
+    assertFeasible(late);
+    assertTrue(early.apResets < late.apResets,
+      `earlier swap (${early.apResets}) should beat later (${late.apResets}) for a Warrior`);
+  });
+
+  test('Magicians are unaffected — no swap burst, Main Stat tracks Base INT', () => {
+    const r = plan({
+      class: 'Magician',
+      goals: { hpGoal: 5000, mpGoal: 15000, targetLevel: 180, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    assertEq(r.params.swapBurst, undefined, 'no swap burst for Mages');
+    const rows = levelTable(CLASSES['Magician'], r.__state, r.__goals, 40, 1.0, r);
+    assertTrue(rows.every(x => x.mainStat === x.baseInt),
+      "Mage Main Stat (INT) tracks Base INT exactly");
+  });
 });
 
 // ────────────────────────── exit ──────────────────────────

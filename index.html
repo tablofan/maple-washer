@@ -233,6 +233,17 @@
     .clamp-note:empty { display: none; }
     .clamp-note .arr { font-style: normal; margin-right: 4px; opacity: 0.7; }
 
+    .hint {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 11.5px;
+      font-weight: 400;
+      color: var(--text-2);
+      margin-top: 4px;
+      line-height: 1.35;
+      display: block;
+    }
+    .hint:empty { display: none; }
+
     .calc-row {
       display: flex;
       align-items: center;
@@ -649,6 +660,11 @@
             <label for="i-target-level">target level</label>
             <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
           </div>
+          <div class="field" id="f-swap-level">
+            <label for="i-swap-level">swap level</label>
+            <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
+            <span class="hint" id="i-swap-level-hint"></span>
+          </div>
         </div>
       </div>
 
@@ -725,6 +741,7 @@
                 <th>hp</th>
                 <th>mp</th>
                 <th>base int</th>
+                <th id="lt-mainstat-head">main stat</th>
                 <th class="phase-col">phase</th>
                 <th>resets / lvl</th>
                 <th>cumul. resets</th>
@@ -792,9 +809,12 @@
       const mpGoal = readField('i-mp-goal');
       const targetLevel = readField('i-target-level');
       const gearInt = readField('i-gear-int');
+      // Swap Level is meaningless for Mages (their Main Stat IS INT — see CONTEXT.md).
+      const swapLevel = classData.isMage ? targetLevel : readField('i-swap-level');
 
       const fields = [level, hp, mp, str, dex, luk, baseInt, hpGoal, mpGoal, targetLevel, gearInt];
       if (fields.some(v => v === null)) return null;
+      if (swapLevel === null) return null;
 
       const mwLevel = Number(mwSelect.value);
       const mwEntry = MAPLE_WARRIOR_LEVELS.find(m => Number(m.level) === mwLevel);
@@ -803,7 +823,7 @@
       return {
         className, classData, mwMultiplier, mwLevel,
         currentState: { level, hp, mp, str, dex, luk, baseInt },
-        goals: { hpGoal, mpGoal, targetLevel },
+        goals: { hpGoal, mpGoal, targetLevel, swapLevel },
         gearInt,
       };
     }
@@ -895,9 +915,14 @@
             <span class="stat-value">lvl ${p.mpWashStart}</span>
           </div>
           <div class="stat-line">
-            <span class="stat-label">Stop MP Wash at</span>
+            <span class="stat-label">${input.classData.isMage ? 'MP Wash ends at' : 'Swap Level'}</span>
             <span class="stat-value">lvl ${p.mpWashStop}</span>
           </div>
+          ${input.classData.isMage ? '' : `
+          <div class="stat-line">
+            <span class="stat-label">HP at Swap Level</span>
+            <span class="stat-value">${fmt(p.hpAtSwap)}</span>
+          </div>`}
           <div class="stat-line">
             <span class="stat-label">Final HP at lvl ${input.goals.targetLevel}</span>
             <span class="stat-value">${fmt(result.finalHP)}</span>
@@ -971,6 +996,8 @@
 
       const rows = levelTable(input.classData, input.currentState, input.goals, input.gearInt, input.mwMultiplier, result);
       $('leveltable-count').textContent = `(${rows.length} levels)`;
+      // The Main Stat column header names the class's actual stat (LUK, STR, DEX…).
+      $('lt-mainstat-head').textContent = input.classData.mainStat.toLowerCase();
       const phaseChangedSet = new Set();
       let prevPhase = null;
       rows.forEach(r => {
@@ -984,6 +1011,7 @@
           <td>${fmt(r.hp)}</td>
           <td>${fmt(r.mp)}</td>
           <td>${fmt(r.baseInt)}</td>
+          <td>${fmt(r.mainStat)}</td>
           <td class="phase-col">${r.phase}</td>
           <td>${r.resetsThisLevel || ''}</td>
           <td>${fmt(r.cumulativeResets)}</td>
@@ -1027,6 +1055,16 @@
         showFormError(`Target Level (${input.goals.targetLevel}) must be greater than Current Level (${input.currentState.level}).`);
         return;
       }
+      // Swap Level may equal Target Level (everything collapses at the goal level) but never exceed it,
+      // and it cannot precede the character's current level.
+      if (input.goals.swapLevel > input.goals.targetLevel) {
+        showFormError(`Swap Level (${input.goals.swapLevel}) cannot be greater than Target Level (${input.goals.targetLevel}).`);
+        return;
+      }
+      if (input.goals.swapLevel < input.currentState.level) {
+        showFormError(`Swap Level (${input.goals.swapLevel}) cannot be lower than Current Level (${input.currentState.level}).`);
+        return;
+      }
       showFormError(null);
       // Clamp HP/MP-ish inputs up to their respective class+level minimums. The user keeps their
       // typed value displayed; the engine receives the floored value. Notes inform them inline.
@@ -1036,7 +1074,16 @@
       renderResult(input, result);
     }
 
-    classSelect.addEventListener('change', () => runCalc());
+    // Mages never swap (their Main Stat IS INT), so the Swap Level input is hidden for them.
+    function syncSwapVisibility() {
+      const isMage = CLASSES[classSelect.value].isMage;
+      $('f-swap-level').hidden = isMage;
+      $('i-swap-level-hint').textContent = isMage
+        ? ''
+        : 'Playable from here — MP Wash stops and Base INT resets to your Main Stat.';
+    }
+
+    classSelect.addEventListener('change', () => { syncSwapVisibility(); runCalc(); });
     mwSelect.addEventListener('change', () => runCalc());
     document.querySelectorAll('input[type=number]').forEach(el => {
       el.addEventListener('input', () => {
@@ -1057,6 +1104,7 @@
         isOpen ? 'Hide full level table' : 'Show full level table';
     });
 
+    syncSwapVisibility();
     runCalc(true);
   </script>
 </body>
