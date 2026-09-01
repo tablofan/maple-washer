@@ -10,7 +10,7 @@ from the interface and exercised directly through a Node.js test suite.
 
 ## Engineering highlights
 
-- Searches over target Base INT and MP-wash start/stop levels to minimize total reset cost.
+- Searches over Target Base INT and MP Wash Start Level; non-Mages supply the stop as their Swap Level, while the Magician cap level remains optimized.
 - Supports fresh characters and partially progressed characters across 11 classes.
 - Models class-specific HP/MP gains, minimum HP/MP constraints, gear INT, Maple Warrior, fresh and
   stale HP washing, and the Magician MP-cap strategy.

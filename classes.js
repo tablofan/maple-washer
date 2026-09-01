@@ -278,6 +278,4 @@ for (const cls of Object.values(CLASSES)) {
   // At target level, non-Mages reset Base INT down to STARTING_MAIN_STAT (-INT +MainStat).
   // Mages skip this — INT is their Main Stat, the reset would be a no-op.
   cls.requiresIntResetAtTarget = !cls.isMage;
-  // Pre-game `Shift from INT` (-INT +MainStat) is meaningful only when MainStat != INT.
-  cls.canShiftIntDownToMainStat = !cls.isMage;
 }

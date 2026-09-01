@@ -859,10 +859,8 @@
     }
 
     const opLabels = {
-      // shift entry is direction-dependent — `op` is computed at render time using breakdown.shiftDir.
-      // `shift_up` source is any non-INT stat (player picks); literal — STAT substitution doesn't apply.
+      // Shift source is any non-INT stat (player picks); literal — STAT substitution doesn't apply.
       shift_up:   { op: '-STR/DEX/LUK +INT', label: 'Mid-progress shift to INT (drawn from your non-INT stats)' },
-      shift_down: { op: '-INT +STAT', label: 'Mid-progress shift from INT (reduce overbuilt INT)' },
       mpWash:     { op: '-MP +INT/STAT', label: 'MP Wash cycles' },
       phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash (post-MP-Wash)' },
       intReset:   { op: '-INT +STAT', label: 'Reset Base INT' },
@@ -912,7 +910,7 @@
           </div>
           <div class="stat-line">
             <span class="stat-label">Start MP Wash at</span>
-            <span class="stat-value">lvl ${p.mpWashStart}</span>
+            <span class="stat-value">${result.breakdown.mpWash > 0 ? `lvl ${p.mpWashFirstLevel}` : 'Not needed'}</span>
           </div>
           <div class="stat-line">
             <span class="stat-label">${input.classData.isMage ? 'MP Wash ends at' : 'Swap Level'}</span>
@@ -969,7 +967,7 @@
         .filter(([key, count]) => typeof count === 'number' && count > 0)
         .sort(([, a], [, b]) => b - a);
       const breakdownHTML = breakdownEntries.map(([key, count]) => {
-        const metaKey = key === 'shift' ? (result.breakdown.shiftDir === 'down' ? 'shift_down' : 'shift_up') : key;
+        const metaKey = key === 'shift' ? 'shift_up' : key;
         const meta = opLabels[metaKey];
         if (!meta) return '';  // skip non-display keys (shiftDir)
         const op = meta.op.replace(/STAT/g, mainStat);

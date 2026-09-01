@@ -142,12 +142,10 @@ describe('Reference cases (Krythan-aligned)', () => {
     assertFeasible(r);
     assertEq(r.finalHP, 30000);
     assertTrue(r.finalMP >= 2000);
-    // Warriors use fresh HP wash (52 HP/AP). Krythan's Warrior sheet gives ~470 resets, but that
-    // figure lets the optimizer pick its own MP-wash stop (his sheet stops around lvl 32 and
-    // fresh-washes the rest). Under ADR 0001 the Swap Level is a USER input, and fixing it at 120
-    // forces ~110 levels of MP wash before any fresh HP wash — correctly costing more (~980).
-    // Earlier swaps are cheaper for Warriors: swap 40 → ~600, swap 180 → ~1670.
-    assertInRange(r.apResets, 850, 1150, 'Warrior AP Resets at swap 120');
+    // Warriors use fresh HP wash (52 HP/AP). Fresh AP that is not needed for INT or MP washing can
+    // go directly to STR before the user-selected swap, bringing this close to Krythan's ~470-reset
+    // baseline rather than incorrectly forcing MP Wash cycles on every pre-swap level.
+    assertInRange(r.apResets, 450, 700, 'Warrior AP Resets at swap 120');
   });
 
   test('Magician fresh start to 5k HP / 10k MP at lvl 180', () => {
@@ -194,18 +192,48 @@ describe('Mid-progress shift mechanic', () => {
     assertTrue(r.breakdown.shift > 0, 'shift should be > 0 (Main Stat → INT)');
     assertEq(r.breakdown.shiftDir, 'up', 'shift direction should be `up`');
   });
-  test('Mid-progress with over-built INT picks a negative shift when target INT is lower', () => {
-    // Lvl 100 Night Lord with way too much Base INT — the optimizer can choose to reduce it.
+  test('Existing Base INT is retained until the Swap Level when it already supplies enough MP', () => {
+    // Keeping the 110 Base INT supplies enough natural INT-based MP to meet the goal. Fresh AP can
+    // go directly to STR before the swap, avoiding all MP Wash AP Resets. Moving INT to STR early
+    // costs the same 106 resets as moving it at the swap, but throws away MP along the way.
     const r = plan({
-      class: 'Night Lord',
-      current: { level: 100, hp: 4000, mp: 8000, baseInt: 800, mainStat: 4 },
-      goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
+      class: 'Hero',
+      current: { level: 40, hp: 1500, mp: 800, baseInt: 110, mainStat: 4 },
+      goals: { hpGoal: 12000, mpGoal: 3000, targetLevel: 180, swapLevel: 160 },
     });
     assertFeasible(r);
-    if (r.params.targetBaseInt < 800) {
-      assertEq(r.breakdown.shiftDir, 'down', 'shift direction should be `down`');
-      assertTrue(r.breakdown.shift > 0, 'shift count should be > 0');
-    }
+    assertEq(r.breakdown.shift, 0, 'Base INT should not be shifted down before levelling');
+    assertEq(r.breakdown.mpWash, 0, 'natural INT-based MP already meets the MP Goal');
+    assertEq(r.params.mpWashFirstLevel, null, 'summary should report that MP Wash is not needed');
+    assertEq(r.breakdown.intReset, 106, 'all Base INT is moved to STR at the Swap Level');
+    assertEq(r.apResets, 106, 'no AP Resets are spent before the Swap Level');
+    const phases = phasePlan(CLASSES['Hero'], r.__state, r.__goals, r);
+    assertTrue(phases.some(p => p.phase === 'Build STR' && /Keep it until the swap/.test(p.action)),
+      'phase plan should retain INT and allocate pre-swap fresh AP to STR');
+    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    const beforeSwap = rows.find(row => row.level === 159);
+    assertEq(beforeSwap.baseInt, 110, 'Base INT remains available for level-up MP gain');
+    assertTrue(beforeSwap.mainStat > 4, 'fresh AP builds STR before the swap');
+  });
+  test('Shift-to-INT search includes Base INT gain thresholds between coarse samples', () => {
+    const r = plan({
+      class: 'Hero',
+      current: { level: 100, hp: 4000, mp: 1500, baseInt: 4, mainStat: 1000 },
+      goals: { hpGoal: 25000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 567, 'threshold-aware target and shift avoid eight unnecessary AP Resets');
+    assertEq(r.breakdown.shift, 66, 'Base INT lands on the next MP-gain threshold');
+  });
+  test('Shift-to-INT search includes distant Base INT gain thresholds', () => {
+    const r = plan({
+      class: 'Buccaneer',
+      current: { level: 100, hp: 4000, mp: 1500, baseInt: 4, luk: 1000 },
+      goals: { hpGoal: 20000, mpGoal: 4000, targetLevel: 180, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 1572, 'complete threshold search avoids 34 unnecessary AP Resets');
+    assertEq(r.breakdown.shift, 586, 'Base INT lands on the optimal distant threshold');
   });
 });
 
@@ -271,7 +299,8 @@ describe('phasePlan output shape', () => {
     const phaseNames = phases.map(p => p.phase);
     assertTrue(phaseNames.includes('Build Base INT'), 'has Build Base INT phase');
     assertTrue(phaseNames.includes('MP Wash'), 'has MP Wash phase');
-    assertTrue(phaseNames.includes('Reset Base INT'), 'has Reset Base INT phase');
+    assertTrue(phaseNames.includes('Reset Base INT') || phaseNames.includes('Stale HP Wash + Reset INT'),
+      'has a Base INT reset phase');
   });
   test('Magician plan does not have a Reset Base INT phase', () => {
     const r = plan({ class: 'Magician', goals: { hpGoal: 5000, mpGoal: 10000, targetLevel: 180 } });
@@ -784,6 +813,12 @@ describe('Swap Level', () => {
     assertFeasible(r);
     assertEq(r.params.mpWashStop, 200, 'MP wash runs to the target level');
     assertTrue(r.finalHP >= 25000, 'HP goal still met');
+    const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
+    const targetEvent = phases.find(p => p.range === 'At Lvl 200' && /Reset Base INT/.test(p.action));
+    assertTrue(Boolean(targetEvent), 'target-level swap event includes the Base INT reset');
+    if (r.params.swapBurst > 0) {
+      assertTrue(/Stale HP Wash/.test(targetEvent.action), 'target-level swap event includes its stale-wash burst');
+    }
   });
 
   test('Swap Level above Target Level is rejected', () => {
@@ -806,7 +841,7 @@ describe('Swap Level', () => {
     assertTrue(/Swap Level/.test(r.reason), 'reason names the Swap Level');
   });
 
-  test('Earlier swaps are cheaper for Warriors (fresh HP wash dominates for them)', () => {
+  test('A level-80 swap is cheaper than a target-level swap for Warriors', () => {
     const early = plan({
       class: 'Hero',
       goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 80 },
@@ -818,7 +853,7 @@ describe('Swap Level', () => {
     assertFeasible(early);
     assertFeasible(late);
     assertTrue(early.apResets < late.apResets,
-      `earlier swap (${early.apResets}) should beat later (${late.apResets}) for a Warrior`);
+      `level-80 swap (${early.apResets}) should beat target-level swap (${late.apResets}) for a Warrior`);
   });
 
   test('Magicians are unaffected — no swap burst, Main Stat tracks Base INT', () => {
