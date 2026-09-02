@@ -192,10 +192,9 @@ describe('Mid-progress shift mechanic', () => {
     assertTrue(r.breakdown.shift > 0, 'shift should be > 0 (Main Stat → INT)');
     assertEq(r.breakdown.shiftDir, 'up', 'shift direction should be `up`');
   });
-  test('Existing Base INT is retained until the Swap Level when it already supplies enough MP', () => {
-    // Keeping the 110 Base INT supplies enough natural INT-based MP to meet the goal. Fresh AP can
-    // go directly to STR before the swap, avoiding all MP Wash AP Resets. Moving INT to STR early
-    // costs the same 106 resets as moving it at the swap, but throws away MP along the way.
+  test('Existing Base INT is retained through pre-Swap Fresh HP Wash when MP Washing is unnecessary', () => {
+    // Keeping the 110 Base INT supplies enough natural INT-based MP to meet the goal, so the
+    // optimizer can skip MP Washing and use a short pre-Swap Fresh HP Wash suffix instead.
     const r = plan({
       class: 'Hero',
       current: { level: 40, hp: 1500, mp: 800, baseInt: 110, mainStat: 4 },
@@ -206,16 +205,16 @@ describe('Mid-progress shift mechanic', () => {
     assertEq(r.breakdown.mpWash, 0, 'natural INT-based MP already meets the MP Goal');
     assertEq(r.params.mpWashFirstLevel, null, 'summary should report that MP Wash is not needed');
     assertEq(r.breakdown.intReset, 106, 'all Base INT is moved to STR at the Swap Level');
-    assertEq(r.breakdown.phase3Fresh, 24, 'post-swap fresh washes supply most of the remaining HP');
-    assertEq(r.breakdown.staleHPWash, 1, 'one stale wash finishes the exact HP gap');
-    assertEq(r.apResets, 131, 'only INT reset and post-swap fresh-wash resets are needed');
+    assertEq(r.breakdown.phase3Fresh, 25, 'five pre-Swap levels supply the remaining HP');
+    assertEq(r.breakdown.staleHPWash, 0, 'fresh washes remove the stale-wash cleanup');
+    assertEq(r.apResets, 131, 'only INT reset and pre-Swap Fresh HP Wash resets are needed');
     const phases = phasePlan(CLASSES['Hero'], r.__state, r.__goals, r);
-    assertTrue(phases.some(p => p.phase === 'Build STR' && /Keep it until the swap/.test(p.action)),
-      'phase plan should retain INT and allocate pre-swap fresh AP to STR');
+    assertTrue(phases.some(p => p.phase === 'Pre-Swap Fresh HP Wash' && /Keep Base INT/.test(p.action)),
+      'phase plan should retain INT through the pre-Swap Fresh HP Wash');
     const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
     const beforeSwap = rows.find(row => row.level === 159);
     assertEq(beforeSwap.baseInt, 110, 'Base INT remains available for level-up MP gain');
-    assertTrue(beforeSwap.mainStat > 4, 'fresh AP builds STR before the swap');
+    assertTrue(beforeSwap.mainStat > 4, 'paired AP Resets build STR before the swap');
   });
   test('Joint INT and fresh-wash search includes Target Base INT gain thresholds', () => {
     const r = plan({
@@ -234,8 +233,8 @@ describe('Mid-progress shift mechanic', () => {
       goals: { hpGoal: 20000, mpGoal: 4000, targetLevel: 180, swapLevel: 120 },
     });
     assertFeasible(r);
-    assertEq(r.apResets, 1614, 'complete threshold search keeps the cheapest joint strategy');
-    assertEq(r.breakdown.shift, 596, 'Base INT lands on the optimal distant threshold');
+    assertEq(r.apResets, 1424, 'complete threshold search keeps the cheaper pre-Swap strategy');
+    assertEq(r.breakdown.shift, 496, 'Base INT lands on the optimal distant threshold');
   });
 });
 
@@ -259,10 +258,14 @@ describe('Engine invariants', () => {
     const b = r.breakdown;
     assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash);
   });
-  test('mpWashStart ≤ mpWashStop ≤ targetLevel always', () => {
+  test('mpWashStart ≤ mpWashEnd ≤ mpWashStop ≤ targetLevel always', () => {
     const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
     assertTrue(r.params.mpWashStart <= r.params.mpWashStop, 'mpWashStart ≤ mpWashStop');
+    assertTrue((r.params.mpWashEnd ?? r.params.mpWashStop) >= r.params.mpWashStart,
+      'mpWashStart ≤ mpWashEnd');
+    assertTrue((r.params.mpWashEnd ?? r.params.mpWashStop) <= r.params.mpWashStop,
+      'mpWashEnd ≤ mpWashStop');
     assertTrue(r.params.mpWashStop <= 180, 'mpWashStop ≤ targetLevel');
   });
   test('Feasible plan with zero Gear INT', () => {
@@ -309,7 +312,7 @@ describe('phasePlan output shape', () => {
     const phaseNames = phases.map(p => p.phase);
     assertTrue(phaseNames.includes('Build Base INT'), 'has Build Base INT phase');
     assertTrue(phaseNames.includes('MP Wash'), 'has MP Wash phase');
-    assertTrue(phaseNames.includes('Reset Base INT') || phaseNames.includes('Stale HP Wash + Reset INT'),
+    assertTrue(phaseNames.some(name => name === 'Reset Base INT' || /Reset INT$/.test(name)),
       'has a Base INT reset phase');
   });
   test('Magician plan does not have a Reset Base INT phase', () => {
@@ -626,27 +629,63 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
 // ────────────────────────── Phase 3 stale-wash absorption ──────────────────────────
 
 describe('Phase 3 stale-wash and peak MP cap', () => {
-  test('Post-swap Fresh HP Washes are counted exactly and frontloaded at 5 per level', () => {
+  test('Optimizer can stop MP Washing early and Fresh HP Wash before the Swap Level', () => {
     const r = plan({
       class: 'Dark Knight',
       current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
     });
     assertFeasible(r);
-    assertEq(r.apResets, 708, 'exact fresh-wash count uses every available post-swap AP');
-    assertEq(r.breakdown.phase3Fresh, 325, '325 fresh AP are washed into HP');
-    assertEq(r.breakdown.staleHPWash, 77, 'remaining HP comes from stale washes');
+    assertTrue(r.params.preSwapFreshHPResets > 0, 'uses pre-Swap Fresh HP Washes');
+    assertTrue(r.params.mpWashEnd < r.params.mpWashStop, 'MP Wash ends before the swap');
+    assertTrue(r.apResets < 708, 'pre-Swap fresh washes improve on the post-Swap-only plan');
 
     const rows = levelTable(CLASSES['Dark Knight'], r.__state, r.__goals, 40, 1.0, r);
-    for (let level = 136; level <= 199; level++) {
+    const firstPreSwap = rows.find(row => row.level > r.params.mpWashEnd && row.level <= 135);
+    assertEq(firstPreSwap.phase, 'Pre-Swap Fresh HP Wash', 'Fresh HP Wash follows the MP Wash phase');
+    assertEq(firstPreSwap.freshHPWashesThisLevel, 5, 'all five fresh AP go to HP');
+    assertEq(firstPreSwap.baseInt, r.params.targetBaseInt, 'Base INT is retained during pre-Swap washing');
+    assertEq(rows.find(row => row.level === 135).baseInt, 4, 'Base INT resets at the user Swap Level');
+    assertEq(rows.at(-1).cumulativeResets, r.apResets, 'level walk reconciles all AP Resets');
+  });
+
+  test('Fresh HP Wash breakdown includes both pre- and post-Swap washes', () => {
+    const r = plan({
+      class: 'Dark Knight',
+      current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
+    });
+    assertFeasible(r);
+    assertEq(r.breakdown.phase3Fresh,
+      r.params.preSwapFreshHPResets + r.params.phase3FreshHPResets,
+      'summary counts every Fresh HP Wash');
+    const phases = phasePlan(CLASSES['Dark Knight'], r.__state, r.__goals, r);
+    assertTrue(phases.some(p => p.phase === 'Pre-Swap Fresh HP Wash'),
+      'Phase Plan names the pre-Swap phase');
+  });
+
+  test('Dark Knight reference plan uses the exact pre-Swap Fresh HP Wash count', () => {
+    const r = plan({
+      class: 'Dark Knight',
+      current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 651, 'pre-Swap washing reduces the reference plan cost');
+    assertEq(r.breakdown.mpWash, 100, '20 levels are MP Washed');
+    assertEq(r.breakdown.phase3Fresh, 355, '71 levels of fresh AP are washed into HP');
+    assertEq(r.breakdown.staleHPWash, 0, 'fresh washes remove the need for stale washes');
+
+    const rows = levelTable(CLASSES['Dark Knight'], r.__state, r.__goals, 40, 1.0, r);
+    for (let level = 65; level <= 134; level++) {
       const row = rows.find(x => x.level === level);
-      assertEq(row.phase, 'Fresh HP Wash', `lvl ${level} frontloads Fresh HP Wash`);
+      assertEq(row.phase, 'Pre-Swap Fresh HP Wash', `lvl ${level} uses pre-Swap Fresh HP Wash`);
       assertEq(row.freshHPWashesThisLevel, 5, `lvl ${level} uses all 5 fresh AP`);
     }
-    assertEq(rows.find(x => x.level === 200).freshHPWashesThisLevel, 5,
-      'target level also uses all 5 fresh AP before cleanup');
-    assertEq(rows.find(x => x.level === 200).phase, 'Fresh + Stale HP Wash',
-      'target cleanup is shown alongside its Fresh HP Washes');
+    assertEq(rows.find(x => x.level === 135).freshHPWashesThisLevel, 5,
+      'Swap Level also uses all 5 fresh AP before resetting INT');
+    assertEq(rows.find(x => x.level === 135).phase, 'Fresh HP Wash + Reset INT',
+      'Swap row shows both operations');
   });
 
   test('Fresh HP Washes wait when frontloading would cross Minimum MP', () => {
@@ -735,6 +774,26 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
       assertTrue(typeof r.params.mpEndPhase2 === 'number', `${className}: mpEndPhase2 present in params`);
       assertTrue(r.params.mpEndPhase2 <= 30000, `${className}: peak MP (${r.params.mpEndPhase2}) ≤ 30k cap`);
     }
+  });
+
+  test('Intermediate pre-Swap MP cap violations are rejected', () => {
+    const r = plan({
+      class: 'Hero',
+      current: { level: 160, hp: 22500, mp: 29400, baseInt: 500 },
+      goals: { hpGoal: 30000, mpGoal: 29900, targetLevel: 180, swapLevel: 180 },
+    });
+    assertInfeasible(r);
+  });
+
+  test('Stale-heavy plans search the exact MP Wash end needed for the MP Goal', () => {
+    const r = plan({
+      class: 'Night Lord',
+      current: { level: 169, hp: 7324, mp: 8585, baseInt: 504 },
+      goals: { hpGoal: 16257, mpGoal: 9208, targetLevel: 200, swapLevel: 197 },
+    });
+    assertFeasible(r);
+    assertEq(r.params.mpWashEnd, 189, 'finds the endpoint beyond the initial estimate');
+    assertEq(r.apResets, 1109, 'returns the minimum-reset endpoint');
   });
 
   test('Stale HP Wash breakdown lumps Phase 3 stale + swap burst + cleanup stale into one count', () => {
@@ -901,14 +960,23 @@ describe('Swap Level', () => {
       goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 200, swapLevel: 200 },
     });
     assertFeasible(r);
-    assertEq(r.params.mpWashStop, 200, 'MP wash runs to the target level');
+    assertEq(r.params.mpWashStop, 200, 'Swap Level remains at the target level');
     assertTrue(r.finalHP >= 25000, 'HP goal still met');
     const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
     const targetEvent = phases.find(p => p.range === 'At Lvl 200' && /Reset Base INT/.test(p.action));
     assertTrue(Boolean(targetEvent), 'target-level swap event includes the Base INT reset');
     if (r.params.swapBurst > 0) {
       assertTrue(/Stale HP Wash/.test(targetEvent.action), 'target-level swap event includes its stale-wash burst');
+      assertTrue(targetEvent.action.indexOf('keeping the HP/MP Pool available')
+        < targetEvent.action.indexOf('Stale HP Wash'),
+      'fresh AP enters the pool before stale washing');
+      assertTrue(targetEvent.action.indexOf('Stale HP Wash')
+        < targetEvent.action.indexOf('reclaim the swap-level fresh AP'),
+      'stale washing happens before the fresh AP is reclaimed');
     }
+    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    assertEq(rows.at(-1).phase, 'Fresh + Stale HP Wash + Reset INT',
+      'target row names every combined swap operation');
   });
 
   test('Swap Level above Target Level is rejected', () => {
@@ -931,7 +999,7 @@ describe('Swap Level', () => {
     assertTrue(/Swap Level/.test(r.reason), 'reason names the Swap Level');
   });
 
-  test('A level-80 swap is cheaper than a target-level swap for Warriors', () => {
+  test('A later Swap Level can be cheaper by retaining INT through Fresh HP Washes', () => {
     const early = plan({
       class: 'Hero',
       goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 80 },
@@ -942,8 +1010,10 @@ describe('Swap Level', () => {
     });
     assertFeasible(early);
     assertFeasible(late);
-    assertTrue(early.apResets < late.apResets,
-      `level-80 swap (${early.apResets}) should beat target-level swap (${late.apResets}) for a Warrior`);
+    assertTrue(late.apResets < early.apResets,
+      `target-level swap (${late.apResets}) should beat level-80 swap (${early.apResets}) for a Warrior`);
+    assertTrue(late.params.mpWashEnd < late.params.mpWashStop,
+      'the later plan retains Base INT through a pre-Swap Fresh HP phase');
   });
 
   test('Magicians are unaffected — no swap burst, Main Stat tracks Base INT', () => {
@@ -956,6 +1026,87 @@ describe('Swap Level', () => {
     const rows = levelTable(CLASSES['Magician'], r.__state, r.__goals, 40, 1.0, r);
     assertTrue(rows.every(x => x.mainStat === x.baseInt),
       "Mage Main Stat (INT) tracks Base INT exactly");
+  });
+});
+
+// ────────────────────────── Web Worker transport ──────────────────────────
+// Node has no Worker, so these assert the *contract* wash-worker.js relies on rather than driving
+// a real worker. The two things that actually break across the boundary are (a) a payload that
+// cannot be structured-cloned, and (b) progress/result shapes drifting from what index.html reads.
+
+describe('Web Worker transport', () => {
+  const WORKER_PAYLOAD_KEYS = ['className', 'currentState', 'goals', 'gearInt', 'mwMultiplier'];
+
+  // Anything non-cloneable here would throw at postMessage time, in the browser only.
+  function assertCloneable(value, path, seen = new Set()) {
+    if (value === null || value === undefined) return;
+    const type = typeof value;
+    if (type === 'function') throw new Error(`${path} is a function — cannot be structured-cloned`);
+    if (type === 'symbol') throw new Error(`${path} is a symbol — cannot be structured-cloned`);
+    if (type !== 'object') return;
+    if (seen.has(value)) throw new Error(`${path} contains a cycle — cannot be structured-cloned`);
+    seen.add(value);
+    if (Array.isArray(value)) value.forEach((v, i) => assertCloneable(v, `${path}[${i}]`, seen));
+    else Object.keys(value).forEach(k => assertCloneable(value[k], `${path}.${k}`, seen));
+  }
+
+  test('The worker payload excludes classData, which carries non-cloneable formulas', () => {
+    for (const className of CLASS_ORDER) {
+      const classData = CLASSES[className];
+      // The hazard this guards against: class entries hold minMPFormula/minHPFormula functions.
+      assertTrue(typeof classData.minMPFormula === 'function',
+        `${className}: expected a function formula to guard against`);
+      const payload = {
+        className,
+        currentState: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
+        goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
+        gearInt: 40,
+        mwMultiplier: 1,
+      };
+      assertEq(JSON.stringify(Object.keys(payload).sort()),
+        JSON.stringify([...WORKER_PAYLOAD_KEYS].sort()), 'payload has exactly the expected keys');
+      assertCloneable(payload, `payload(${className})`);
+    }
+  });
+
+  test('optimize reports progress over a bounded, monotone outer loop', () => {
+    const updates = [];
+    const r = optimize(CLASSES['Dark Knight'],
+      { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
+      { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
+      40, 1.0, p => updates.push(p));
+    assertFeasible(r);
+    assertTrue(updates.length > 0, 'progress callback fires at least once');
+    assertTrue(updates.length < 500,
+      `progress is reported per outer-loop step, not per candidate (got ${updates.length})`);
+    const last = updates[updates.length - 1];
+    assertEq(last.phase, 'searching', 'progress carries the expected phase label');
+    assertTrue(last.total > 0, 'progress carries a positive total');
+    assertTrue(last.completed < last.total, 'completed never exceeds total');
+    for (let i = 1; i < updates.length; i++) {
+      assertTrue(updates[i].completed > updates[i - 1].completed,
+        'progress completed is strictly increasing');
+      assertEq(updates[i].total, updates[i - 1].total, 'progress total is stable');
+    }
+  });
+
+  test('optimize still works with no progress callback (Node tests and inline fallback)', () => {
+    const r = optimize(CLASSES['Night Lord'],
+      { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 },
+      { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 },
+      40, 1.0);
+    assertFeasible(r);
+    assertTrue(r.apResets > 0, 'returns a plan without a callback');
+  });
+
+  test('optimize reports the infeasibility reason through the same return shape', () => {
+    const r = optimize(CLASSES['Magician'],
+      { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 },
+      { hpGoal: 30000, mpGoal: 5000, targetLevel: 50, swapLevel: 50 },
+      40, 1.0);
+    assertInfeasible(r);
+    // The worker posts this object back verbatim.
+    assertCloneable(r, 'infeasibleResult');
   });
 });
 

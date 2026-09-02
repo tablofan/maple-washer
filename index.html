@@ -284,6 +284,45 @@
       color: var(--text-mute);
     }
 
+    /* Calculation runs off the main thread in a Web Worker. This only communicates that a run is
+       in flight and how far along it is; the page stays interactive throughout. */
+    .calc-progress {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 13.5px;
+      color: var(--text-mute);
+    }
+    .calc-progress.active { display: flex; }
+    .calc-progress-track {
+      width: 140px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--rule);
+      overflow: hidden;
+    }
+    .calc-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--amber);
+      border-radius: 2px;
+      transition: width 0.2s ease;
+    }
+    .calc-progress-bar.indeterminate {
+      width: 40%;
+      animation: calc-indeterminate 1.1s ease-in-out infinite;
+    }
+    @keyframes calc-indeterminate {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .calc-progress-bar.indeterminate { animation: none; width: 100%; }
+    }
+    .btn-calc[disabled] { opacity: 0.55; cursor: progress; }
+    .btn-calc[disabled]:hover { transform: none; box-shadow: none; background: var(--amber); }
+
     .field.invalid { border-bottom-color: var(--maple); }
     .field.invalid label { color: var(--maple); }
 
@@ -686,7 +725,13 @@
 
       <div class="calc-row">
         <button id="btn-calc" type="submit" class="btn-calc">Calculate optimal plan <span class="arr">→</span></button>
-        <span class="calc-hint">Output recomputes when you change inputs. Press Enter to recalculate.</span>
+        <span class="calc-hint" id="calc-hint">Output recomputes when you change inputs. Press Enter to recalculate.</span>
+        <span class="calc-progress" id="calc-progress" role="status" aria-live="polite">
+          <span class="calc-progress-track">
+            <span class="calc-progress-bar" id="calc-progress-bar"></span>
+          </span>
+          <span id="calc-progress-label">Calculating…</span>
+        </span>
       </div>
     </section>
     </form>
@@ -862,7 +907,7 @@
       // Shift source is any non-INT stat (player picks); literal — STAT substitution doesn't apply.
       shift_up:   { op: '-STR/DEX/LUK +INT', label: 'Mid-progress shift to INT (drawn from your non-INT stats)' },
       mpWash:     { op: '-MP +INT/STAT', label: 'MP Wash cycles' },
-      phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash (post-MP-Wash)' },
+      phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash' },
       intReset:   { op: '-INT +STAT', label: 'Reset Base INT' },
       staleHPWash:{ op: '-MP +HP', label: 'Stale HP Wash (mid-flight + cleanup)' },
     };
@@ -1041,6 +1086,98 @@
       requestAnimationFrame(tick);
     }
 
+    // ── Calculation transport ────────────────────────────────────────────────────────────────
+    // The optimizer is CPU-bound and can take tens of seconds on a wide search. Running it on the
+    // main thread froze the whole page. We hand it to a Web Worker when available and fall back to
+    // a synchronous call otherwise — both paths call the same engine function, so results match.
+    const calcWorker = (() => {
+      try {
+        // Relative URL, same origin: deployable to GitHub Pages as a static file.
+        return new Worker('./wash-worker.js');
+      } catch {
+        return null;  // file:// origins and workers-disabled environments
+      }
+    })();
+
+    // Runs are keyed so a stale response (from a superseded input change) is dropped rather than
+    // rendered over a newer result.
+    let runToken = 0;
+
+    function setCalcRunning(isRunning) {
+      const progress = $('calc-progress');
+      const bar = $('calc-progress-bar');
+      $('btn-calc').disabled = isRunning;
+      $('calc-hint').style.display = isRunning ? 'none' : '';
+      progress.classList.toggle('active', isRunning);
+      bar.classList.remove('indeterminate');
+      bar.style.width = '0%';
+      if (isRunning) $('calc-progress-label').textContent = 'Calculating…';
+    }
+
+    function setCalcProgress(completed, total) {
+      const bar = $('calc-progress-bar');
+      if (!total) return;
+      const pct = Math.max(0, Math.min(100, (completed / total) * 100));
+      bar.classList.remove('indeterminate');
+      bar.style.width = pct + '%';
+      $('calc-progress-label').textContent = `Calculating… ${completed}/${total}`;
+    }
+
+    function showResult(input, result) {
+      setCalcRunning(false);
+      renderResult(input, result);
+    }
+
+    // Payload sent across the worker boundary. `classData` is deliberately excluded: it holds
+    // function properties (minMPFormula/minHPFormula) that cannot be structured-cloned. The worker
+    // re-resolves the class from `className` against its own CLASSES table.
+    function calcPayload(input) {
+      return {
+        className: input.className,
+        currentState: input.currentState,
+        goals: input.goals,
+        gearInt: input.gearInt,
+        mwMultiplier: input.mwMultiplier,
+      };
+    }
+
+    function runOnWorker(input, token) {
+      calcWorker.onmessage = (event) => {
+        if (token !== runToken) return;  // superseded by a newer run
+        const msg = event.data;
+        if (msg.type === 'progress') {
+          setCalcProgress(msg.completed, msg.total);
+        } else if (msg.type === 'result') {
+          showResult(input, msg.result);
+        } else if (msg.type === 'error') {
+          setCalcRunning(false);
+          showFormError('Calculation failed: ' + msg.message);
+        }
+      };
+      calcWorker.onerror = () => {
+        if (token !== runToken) return;
+        // Worker is unusable (script failed to load, etc.) — drop it and compute inline from here on.
+        setCalcRunning(false);
+        showFormError('Background calculation unavailable; running on the main thread.');
+        calcWorker.terminate();
+        runInline(input, token);
+      };
+      calcWorker.postMessage(calcPayload(input));
+    }
+
+    function runInline(input, token) {
+      // Yield once so the button/progress state paints before we block the thread.
+      requestAnimationFrame(() => {
+        if (token !== runToken) return;
+        $('calc-progress-bar').classList.add('indeterminate');
+        $('calc-progress-label').textContent = 'Calculating… (main thread)';
+        const result = optimize(input.classData, input.currentState, input.goals,
+          input.gearInt, input.mwMultiplier);
+        if (token !== runToken) return;
+        showResult(input, result);
+      });
+    }
+
     function runCalc(force = false) {
       const input = readInputs();
       if (!input) {
@@ -1068,8 +1205,13 @@
       // typed value displayed; the engine receives the floored value. Notes inform them inline.
       const clampNotes = prepareInputs(input.classData, input.currentState, input.goals, input.className);
       renderClampNotes(clampNotes);
-      const result = optimize(input.classData, input.currentState, input.goals, input.gearInt, input.mwMultiplier);
-      renderResult(input, result);
+
+      // Inputs are cloned on the way into the worker, so mutate-safe copies matter only for the
+      // inline path; prepareInputs has already normalised `input.goals` either way.
+      const token = ++runToken;
+      setCalcRunning(true);
+      if (calcWorker) runOnWorker(input, token);
+      else runInline(input, token);
     }
 
     // Mages never swap (their Main Stat IS INT), so the Swap Level input is hidden for them.

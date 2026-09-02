@@ -10,7 +10,7 @@ from the interface and exercised directly through a Node.js test suite.
 
 ## Engineering highlights
 
-- Searches over Target Base INT and MP Wash Start Level; non-Mages supply the stop as their Swap Level, while the Magician cap level remains optimized.
+- Searches over Target Base INT, MP Wash Start Level, and an internal transition from MP Wash to pre-Swap Fresh HP Wash; non-Mages still choose their Swap Level, while the Magician cap level remains optimized.
 - Supports fresh characters and partially progressed characters across 11 classes.
 - Models class-specific HP/MP gains, minimum HP/MP constraints, gear INT, Maple Warrior, fresh and
   stale HP washing, and the Magician MP-cap strategy.
@@ -26,13 +26,18 @@ from the interface and exercised directly through a Node.js test suite.
 | --- | --- |
 | `classes.js` | Class constants, limits, and formula inputs |
 | `engine.js` | Optimization, feasibility checks, phase planning, and level projection |
+| `wash-worker.js` | Web Worker wrapper that runs `optimize` off the main thread |
 | `index.html` | Browser interface and result presentation |
 | `tests/engine.test.js` | Dependency-free Node.js test harness |
 | `CONTEXT.md` | Domain model, terminology, constraints, and reference notes |
 
 ## Run locally
 
-There is no build step. Open `index.html` directly, or serve the repository locally:
+There is no build step. Serve the repository locally:
+
+> A local server is required because the calculator runs in a Web Worker, and browsers block
+> worker scripts on `file://` origins. Without a worker, the page falls back to computing on the
+> main thread, which freezes the UI during long searches.
 
 ```sh
 python3 -m http.server 8731
