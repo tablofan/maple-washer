@@ -86,7 +86,7 @@ Magicians have no **Swap Level** — their **Main Stat** *is* INT, so they are p
 The peak **Base INT** the calculator decides the user should build up to. Reached at or before **Swap Level** and sustained until then. Reset back to **Main Stat** at **Swap Level**.
 
 **Post-Swap Fresh HP Wash**:
-The default allocation for the stretch from **Swap Level** to **Target Level**: each level's fresh AP goes to HP (**Fresh HP Wash**) *paired with* `-MP +MainStat` **AP Resets** on the same levels, so the level yields both HP and **Main Stat**. The pairing rate is set as high as the **MP Goal** allows (max 5/level) — raising it one point trades exactly `staleAPHP` HP for 1 **Main Stat** at no change in total **AP Resets**, because `-MP +MainStat` and `-MP +HP` cost the same reset and the same MP. Lowering it is only ever forced, never chosen: it is required when the **MP Goal** would otherwise be missed, and it cannot rescue an **HP Goal** that is short (the HP shortfall is unaffected by the rate).
+The default allocation for the stretch from **Swap Level** to **Target Level**: fresh AP goes to HP (**Fresh HP Wash**) *paired with* `-MP +MainStat` **AP Resets**, so each wash yields both HP and **Main Stat**. The optimizer chooses the exact total count needed, then frontloads it at the maximum 5 fresh AP per level from immediately after **Swap Level**. Once that count is exhausted, later fresh AP goes directly into **Main Stat**. Because Fresh HP Wash yields more HP than **Stale HP Wash** for the same one-reset and MP cost, using the exact count can replace several stale washes and reduce total NX as well as delivering HP sooner.
 _Avoid_: fresh wash toggle, HP wash mode
 
 **Phase Plan**:
@@ -110,7 +110,7 @@ The calculator's job is to find the **Phase Plan** that minimises total **AP Res
 - **Target Base INT**
 - **MP Wash Start Level**
 - ~~**MP Wash Stop Level**~~ — no longer searched. Supplied by the user as their **Swap Level** (see below).
-- The mix of **Fresh HP Wash** and **Stale HP Wash** per Phase 3 level (combinable: both drain MP at `mpLossPerReset` and add HP, fresh at the higher rate, stale via existing MP)
+- The exact count of **Fresh HP Washes**, frontloaded at up to 5 per level after **Swap Level**, plus any **Stale HP Wash** needed to absorb MP or finish the **HP Goal**
 - For mid-progress users: amount of **Shift to INT** (from any non-INT stat) to do up-front, if it lowers total cost. Existing **Base INT** is retained until **Swap Level**: shifting it down earlier costs the same AP Resets as the swap while discarding useful MP gain.
 
 ## Output

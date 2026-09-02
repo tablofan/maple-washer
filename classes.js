@@ -2,6 +2,7 @@
 // Source: Nise's compilation (https://forum.legends.ml/index.php?threads/nises-hp-washing-formula-compilation.38558/)
 // cross-checked against Krythan's per-class washing sheets.
 // All HP/MP values are mid-range averages (the calculator does not model the random rolls).
+// MapleLegends grants HP/MP bonuses only on 1st and 2nd job advancement.
 
 const CLASS_ORDER = [
   'Night Lord', 'Shadower',
@@ -30,8 +31,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 325, mp: 175 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Shadower': {
@@ -51,8 +50,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 325, mp: 175 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Bowmaster': {
@@ -72,8 +69,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 325, mp: 175 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Marksman': {
@@ -93,8 +88,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 325, mp: 175 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Corsair': {
@@ -115,8 +108,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 225, mp: 162 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Buccaneer': {
@@ -140,8 +131,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 162, mp: 0 },
       { level: 30, hp: 225, mp: 162 },
-      { level: 70, hp: 625, mp: 0 },
-      { level: 120, hp: 925, mp: 0 },
     ],
   },
   'Hero': {
@@ -161,8 +150,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 225, mp: 0 },
       { level: 30, hp: 325, mp: 0 },
-      { level: 70, hp: 1025, mp: 0 },
-      { level: 120, hp: 1825, mp: 0 },
     ],
   },
   'Dark Knight': {
@@ -182,8 +169,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 225, mp: 0 },
       { level: 30, hp: 0, mp: 125 },
-      { level: 70, hp: 1025, mp: 0 },
-      { level: 120, hp: 1825, mp: 0 },
     ],
   },
   'Paladin': {
@@ -203,8 +188,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 10, hp: 225, mp: 0 },
       { level: 30, hp: 0, mp: 125 },
-      { level: 70, hp: 1025, mp: 0 },
-      { level: 120, hp: 1825, mp: 0 },
     ],
   },
   'Magician': {
@@ -228,8 +211,6 @@ const CLASSES = {
     jaBonuses: [
       { level: 8, hp: 0, mp: 125 },
       { level: 30, hp: 0, mp: 475 },
-      { level: 70, hp: 0, mp: 0 },
-      { level: 120, hp: 0, mp: 0 },
     ],
   },
   'Beginner': {

@@ -260,16 +260,15 @@ function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentLeve
   };
 }
 
-// Phase 3: from mpWashStop (= Swap Level) → targetLevel. Each level can combine `freshHPPerLevelPhase3`
-// fresh-AP-to-HP wash AND `staleHPPerLevelPhase3` -MP+HP resets. Each fresh-AP-to-HP is paired with a
-// `-MP +MainStat` reset (see CONTEXT.md: Post-Swap Fresh HP Wash), so `freshHPPerLevelPhase3` counts
-// both the AP allocations and their accompanying resets. Both drain MP via reset cost.
+// Phase 3: from mpWashStop (= Swap Level) → targetLevel. `phase3FreshHPResets` is the exact total
+// number of fresh-AP-to-HP washes, frontloaded at up to 5 per level by levelTable. Each is paired
+// with a `-MP +MainStat` reset (see CONTEXT.md: Post-Swap Fresh HP Wash). Phase 3 can also combine
+// `staleHPPerLevelPhase3` -MP+HP resets. Both drain MP via reset cost.
 //
 // Base INT is STARTING_MAIN_STAT throughout Phase 3 — the reset to MainStat happened AT the swap.
 function runPhase3(classData, params, goals, gearInt, mwMultiplier) {
-  const { mpWashStop, freshHPPerLevelPhase3, staleHPPerLevelPhase3 = 0 } = params;
+  const { mpWashStop, phase3FreshHPResets = 0, staleHPPerLevelPhase3 = 0 } = params;
   const phase3Levels = goals.targetLevel - mpWashStop;
-  const phase3FreshHPResets = phase3Levels * freshHPPerLevelPhase3;
   const phase3StaleHPResets = phase3Levels * staleHPPerLevelPhase3;
 
   const hpFromFresh = freshHPWashYield(classData, phase3FreshHPResets);
@@ -332,9 +331,9 @@ function runCleanup(classData, hpEndPhase3, mpEndPhase3Raw, goals, targetBaseInt
 //   (Pre-game) Optional `shift`: AP-Reset `-<non-INT> +INT` (source is any of the user's non-INT stats).
 //   Phase 1 (currentLevel → mpWashStart): Fresh AP → INT until Target Base INT, then → Main Stat.
 //   Phase 2 (mpWashStart → mpWashStop):  MP Wash. Fresh AP → MP. 5 AP Resets/lvl: -MP +INT until targetBaseInt, then -MP +MainStat.
-//   Phase 3 (mpWashStop → targetLevel): Combinable per level — `freshHPPerLevelPhase3` fresh-AP→HP (each paired
-//              with a -MP +MainStat reset) AND `staleHPPerLevelPhase3` -MP +HP resets (drains MP into HP at the
-//              stale rate; required when peak MP would otherwise blow past the 30k cap).
+//   Phase 3 (mpWashStop → targetLevel): Frontload `phase3FreshHPResets` fresh-AP→HP washes at 5/level
+//              (each paired with a -MP +MainStat reset), plus `staleHPPerLevelPhase3` -MP +HP resets
+//              (drains MP into HP at the stale rate; required when peak MP would otherwise exceed 30k).
 //   At targetLevel: Stale HP wash (-MP +HP) to fill remaining HP gap, then Reset Base INT (-INT +MainStat) to STARTING_MAIN_STAT (skipped for Mages).
 //
 // Returns { feasible, finalHP, finalMP, apResets, breakdown, params }.
@@ -372,9 +371,9 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
     + p2.mpFromMPWash_build + p2.mpFromMPWash_plateau;
 
   // HP accumulated by the swap (natural + JA only — no HP washing happens before the swap).
-  const hpAtSwapNatural = currentState.hp
+  const hpAtSwapNatural = Math.min(MAX_HP, currentState.hp
     + cumulativeNaturalHP(classData, currentState.level, mpWashStop)
-    + jaHPBonusInRange(classData, currentState.level, mpWashStop);
+    + jaHPBonusInRange(classData, currentState.level, mpWashStop));
 
   // Natural HP/MP accrued over the whole plan, for the peak-MP and final checks below.
   const naturalMPInPhase3 = ranges.naturalMPInRange(mpWashStop, goals.targetLevel);
@@ -382,7 +381,8 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
 
   // --- Swap burst: convert banked MP → HP at the swap (free — see runSwapBurst) ---
   // HP still needed from stale washes once fresh AP→HP and the swap burst have contributed.
-  const hpEndPhase3 = currentState.hp + ranges.hpNatural + ranges.hpJA + p3.hpFromFresh + p3.hpFromStale;
+  const hpEndPhase3 = Math.min(MAX_HP,
+    currentState.hp + ranges.hpNatural + ranges.hpJA + p3.hpFromFresh + p3.hpFromStale);
   const needWashes = Math.ceil(Math.max(0, goals.hpGoal - hpEndPhase3) / classData.staleAPHP);
   const hpGrowthAfterSwap = (currentState.hp + ranges.hpNatural + ranges.hpJA) - hpAtSwapNatural
     + p3.hpFromFresh + p3.hpFromStale;
@@ -397,7 +397,6 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
   // --- 30k caps + Min MP/HP invariant checks ---
   const peakMP = Math.max(mpEndPhase2, mpEndPhase3Raw);
   if (peakMP > MAX_MP) return { feasible: false, reason: `Plan overshoots the 30,000 MP cap (peak would reach ${Math.round(peakMP)})` };
-  if (hpEndPhase3 > MAX_HP) return { feasible: false, reason: `Plan overshoots the 30,000 HP cap (would reach ${Math.round(hpEndPhase3)})` };
 
   // Min MP only binds once you try to -MP +X reset at that level. A character below 2nd job
   // legitimately sits under the Min MP formula (a fresh lvl 1 has MP 5 vs a formula value of ~149),
@@ -605,7 +604,7 @@ function evaluateCapWash(classData, currentState, goals, gearInt, mwMultiplier, 
       // Phase-3 cap-wash fields (read by levelTable / phasePlan):
       phase3StaleHPResets: capWashes,
       cleanupStaleHPWash: 0,
-      freshHPPerLevelPhase3: 0,
+      phase3FreshHPResets: 0,
       staleHPPerLevelPhase3: 0,
     },
   };
@@ -738,8 +737,21 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier) {
   // per-level walk and, if it falls short, keep searching with it excluded. levelTable is what the
   // user sees, so it is authoritative.
   const verifyWithWalk = (result) => {
-    const last = levelTable(classData, currentState, goals, gearInt, mwMultiplier, result).pop();
-    return last.hp >= goals.hpGoal && last.mp >= goals.mpGoal;
+    const rows = levelTable(classData, currentState, goals, gearInt, mwMultiplier, result);
+    const last = rows[rows.length - 1];
+    const respectsMinimumMP = rows.every(row => row.mpResetsThisLevel === 0
+      || row.level < secondJALevel(classData)
+      || row.mp >= minMPAtLevel(classData, row.level));
+    const scheduledEveryReset = classData.isMage || last.cumulativeResets === result.apResets;
+    const scheduledFresh = rows.reduce((sum, row) => sum + row.freshHPWashesThisLevel, 0);
+    const scheduledEveryFreshWash = classData.isMage
+      || scheduledFresh === result.params.phase3FreshHPResets;
+    return {
+      valid: last.hp >= goals.hpGoal && last.mp >= goals.mpGoal
+        && respectsMinimumMP && scheduledEveryReset && scheduledEveryFreshWash,
+      rows,
+      last,
+    };
   };
 
   const targetBaseIntCandidates = new Set();
@@ -834,24 +846,38 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier) {
             continue;
           }
 
-          // Non-Mages: Post-Swap Fresh HP Wash. Each post-swap level spends its fresh AP on HP and
-          // pairs it with a `-MP +MainStat` reset. Per CONTEXT.md the rate is set as high as the
-          // MP Goal allows (max 5/level), falling back only when a lower rate is forced. Total
-          // AP Resets are invariant to the rate (a Main Stat point and a stale HP point cost the
-          // same reset and the same MP), so we try 5 first and stop at the first feasible rate —
-          // never searching lower out of preference.
-          // When the Swap Level IS the Target Level there is no post-swap stretch, so Phase 3 must
-          // be empty — a non-zero rate would book fresh AP + resets on levels that don't exist.
-          const maxFresh = mpWashStop >= goals.targetLevel ? 0 : 5;
+          // Non-Mages: use the exact number of Post-Swap Fresh HP Washes needed, then frontload
+          // them at 5 per level. Fresh washes yield more HP than stale washes for the same reset and
+          // MP cost, so only counts around the HP-gap breakpoint can minimize total AP Resets.
+          const phase3Levels = goals.targetLevel - mpWashStop;
+          const maxFresh = phase3Levels * 5;
           const maxStale = mpWashStop >= goals.targetLevel ? 0 : 5;
-          // Search EVERY rate and let consider() keep the cheapest. A higher pairing rate is only
-          // worth paying for when it's the cheapest way to reach the HP Goal — when the goal is
-          // already met (or overshot), a lower rate is strictly cheaper, so settling on the highest
-          // feasible rate would spend resets on HP nobody asked for.
-          for (let freshHPPerLevelPhase3 = maxFresh; freshHPPerLevelPhase3 >= 0; freshHPPerLevelPhase3--) {
-            for (let staleHPPerLevelPhase3 = 0; staleHPPerLevelPhase3 <= maxStale; staleHPPerLevelPhase3++) {
+          const p2ForFreshCandidates = runPhase2(classData, {
+            targetBaseInt, mpWashStart, mpWashStop,
+          }, phase1Cache, gearInt, mwMultiplier, currentState.level);
+          const phase3IntMP = intMPContribution(mpWashStop, goals.targetLevel,
+            STARTING_MAIN_STAT, STARTING_MAIN_STAT, gearInt, mwMultiplier);
+          for (let staleHPPerLevelPhase3 = 0; staleHPPerLevelPhase3 <= maxStale; staleHPPerLevelPhase3++) {
+            const phase3StaleHPResets = phase3Levels * staleHPPerLevelPhase3;
+            const hpBeforeFresh = currentState.hp + ranges.hpNatural + ranges.hpJA
+              + staleHPWashYield(classData, phase3StaleHPResets);
+            const idealFresh = (goals.hpGoal - hpBeforeFresh) / classData.freshAPHP;
+            const mpBeforePhase3Resets = currentState.mp + ranges.mpNaturalBase + ranges.mpJA
+              + phase1Cache.mpFromInt
+              + p2ForFreshCandidates.mpFromInt_build + p2ForFreshCandidates.mpFromInt_plateau
+              + p2ForFreshCandidates.mpFromMPWash_build + p2ForFreshCandidates.mpFromMPWash_plateau
+              + phase3IntMP - washCycleMPCost(classData, phase3StaleHPResets);
+            const freshForMPCap = Math.ceil(Math.max(0, mpBeforePhase3Resets - MAX_MP)
+              / classData.mpLossPerReset);
+            const freshCandidates = new Set();
+            for (let delta = -2; delta <= 2; delta++) {
+              freshCandidates.add(Math.max(0, Math.min(maxFresh, Math.floor(idealFresh) + delta)));
+              freshCandidates.add(Math.max(0, Math.min(maxFresh, Math.ceil(idealFresh) + delta)));
+              freshCandidates.add(Math.max(0, Math.min(maxFresh, freshForMPCap + delta)));
+            }
+            for (const phase3FreshHPResets of freshCandidates) {
               const r = evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier, {
-                targetBaseInt, mpWashStart, mpWashStop, shift, freshHPPerLevelPhase3, staleHPPerLevelPhase3,
+                targetBaseInt, mpWashStart, mpWashStop, shift, phase3FreshHPResets, staleHPPerLevelPhase3,
               }, ranges, phase1Cache);
               consider(r);
             }
@@ -863,11 +889,14 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier) {
 
   // Accept the cheapest candidate that the per-level walk confirms actually reaches both goals.
   for (const candidate of runners) {
-    if (verifyWithWalk(candidate)) {
-      const last = levelTable(classData, currentState, goals, gearInt, mwMultiplier, candidate).pop();
+    const walk = verifyWithWalk(candidate);
+    if (walk.valid) {
       // Report the walk's numbers so the Summary and the level table always agree.
-      candidate.finalHP = last.hp;
-      candidate.finalMP = last.mp;
+      candidate.finalHP = walk.last.hp;
+      candidate.finalMP = walk.last.mp;
+      candidate.params.phase3FreshSchedule = walk.rows
+        .filter(row => row.freshHPWashesThisLevel > 0)
+        .map(row => ({ level: row.level, count: row.freshHPWashesThisLevel }));
       return candidate;
     }
   }
@@ -897,6 +926,7 @@ function phasePlan(classData, currentState, goals, result) {
   const p = result.params;
   const b = result.breakdown;
   const phases = [];
+  const apResets = count => `${count} AP Reset${count === 1 ? '' : 's'}`;
 
   if (b.shift > 0 && b.shiftDir === 'up') {
     phases.push({
@@ -933,8 +963,8 @@ function phasePlan(classData, currentState, goals, result) {
     const burst = p.swapBurst || 0;
     const intResets = b.intReset;
     const parts = [];
-    if (burst > 0) parts.push(`${burst} AP Resets: -MP +HP (Stale HP Wash — convert banked MP into HP now)`);
-    if (intResets > 0) parts.push(`${intResets} AP Resets: -INT +${classData.mainStat} (Reset Base INT — you are playable from here)`);
+    if (burst > 0) parts.push(`${apResets(burst)}: -MP +HP (Stale HP Wash — convert banked MP into HP now)`);
+    if (intResets > 0) parts.push(`${apResets(intResets)}: -INT +${classData.mainStat} (Reset Base INT — you are playable from here)`);
     if (parts.length > 0) {
       phases.push({
         range: `At Lvl ${p.mpWashStop}${p.mpWashStop < goals.targetLevel ? ' (swap)' : ''}`,
@@ -954,25 +984,44 @@ function phasePlan(classData, currentState, goals, result) {
       phase: 'MP-Cap HP Wash',
     });
   } else if (goals.targetLevel > p.mpWashStop) {
-    const fresh = p.freshHPPerLevelPhase3;
     const stale = p.staleHPPerLevelPhase3 || 0;
-    if (fresh > 0 || stale > 0) {
+    const phase3Start = p.mpWashStop + 1;
+    const scheduledFresh = new Map((p.phase3FreshSchedule || []).map(x => [x.level, x.count]));
+    if (scheduledFresh.size === 0 && p.phase3FreshHPResets > 0) {
+      let remaining = p.phase3FreshHPResets;
+      for (let level = phase3Start; level <= goals.targetLevel && remaining > 0; level++) {
+        const count = Math.min(5, remaining);
+        scheduledFresh.set(level, count);
+        remaining -= count;
+      }
+    }
+    const groups = [];
+    for (let level = phase3Start; level <= goals.targetLevel; level++) {
+      const count = scheduledFresh.get(level) || 0;
+      const last = groups[groups.length - 1];
+      if (last && last.count === count) last.end = level;
+      else groups.push({ start: level, end: level, count });
+    }
+    for (const group of groups) {
       const parts = [];
-      if (fresh > 0) parts.push(`${fresh} fresh AP per level → HP (Fresh HP Wash) + ${fresh} AP Resets: -MP +${classData.mainStat}`);
-      if (stale > 0) parts.push(`${stale} AP Resets per level: -MP +HP (Stale HP Wash, absorbs MP)`);
-      const phaseName = (fresh > 0 && stale > 0) ? 'Fresh + Stale HP Wash'
-                      : fresh > 0 ? 'Fresh HP Wash'
-                      : 'Stale HP Wash';
+      if (group.count > 0) {
+        parts.push(`${group.count} fresh AP per level → HP (Fresh HP Wash)`);
+        parts.push(`${apResets(group.count)} per level: -MP +${classData.mainStat}`);
+        if (group.count < 5) {
+          parts.push(`${5 - group.count} remaining fresh AP per level → ${classData.mainStat}`);
+        }
+      } else {
+        parts.push(`Allocate fresh AP to ${classData.mainStat}`);
+      }
+      if (stale > 0) parts.push(`${apResets(stale)} per level: -MP +HP (Stale HP Wash, absorbs MP)`);
+      const phase = group.count > 0 && stale > 0 ? 'Fresh + Stale HP Wash'
+        : group.count > 0 ? 'Fresh HP Wash'
+        : stale > 0 ? 'Stale HP Wash'
+        : `Build ${classData.mainStat}`;
       phases.push({
-        range: `Lvl ${p.mpWashStop} → ${goals.targetLevel}`,
+        range: group.start === group.end ? `Lvl ${group.start}` : `Lvl ${group.start} → ${group.end}`,
         action: parts.join(' · ') + '.',
-        phase: phaseName,
-      });
-    } else {
-      phases.push({
-        range: `Lvl ${p.mpWashStop} → ${goals.targetLevel}`,
-        action: `Allocate fresh AP to ${classData.mainStat}.`,
-        phase: `Build ${classData.mainStat}`,
+        phase,
       });
     }
   }
@@ -980,7 +1029,7 @@ function phasePlan(classData, currentState, goals, result) {
   if (p.cleanupStaleHPWash > 0) {
     phases.push({
       range: `At Lvl ${goals.targetLevel}`,
-      action: `${p.cleanupStaleHPWash} AP Resets: -MP +HP (Stale HP Wash, fill remaining HP gap).`,
+      action: `${apResets(p.cleanupStaleHPWash)}: -MP +HP (Stale HP Wash, fill remaining HP gap).`,
       phase: 'Stale HP Wash',
     });
   }
@@ -1004,9 +1053,12 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
     ? baseInt
     : (currentState[classData.mainStat.toLowerCase()] ?? STARTING_MAIN_STAT);
   let cumulativeResets = result.breakdown.shift;  // pre-game shift counted at level 0
+  let phase3FreshRemaining = p.phase3FreshHPResets || 0;
 
   for (let L = currentState.level; L <= goals.targetLevel; L++) {
     let resetsThisLevel = 0;
+    let mpResetsThisLevel = 0;
+    let freshHPWashesThisLevel = 0;
     let phase = '';
 
     if (L > currentState.level) {
@@ -1022,6 +1074,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           mp += ja.mp;
         }
       }
+      hp = Math.min(MAX_HP, hp);
     }
 
     // Phase classification + actions
@@ -1047,6 +1100,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         // 5 cycles/lvl, each cycle gain = washCycleMP(class, current baseInt).
         mp += 5 * washCycleMP(classData, baseInt);
         resetsThisLevel = 5;
+        mpResetsThisLevel = 5;
       }
     } else if (!p.capWash && L === p.mpWashStop && L < goals.targetLevel) {
       // === THE SWAP === One event: MP→HP burst, then Reset Base INT → Main Stat (ADR 0001).
@@ -1060,6 +1114,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           mainStat += 5 - resetsToInt;
           mp += 5 * washCycleMP(classData, baseInt);
           resetsThisLevel = 5;
+          mpResetsThisLevel = 5;
         } else {
           const freshToInt = Math.min(5, Math.max(0, p.targetBaseInt - baseInt));
           baseInt += freshToInt;
@@ -1075,6 +1130,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       mainStat += intResets;
       baseInt = classData.requiresIntResetAtTarget ? STARTING_MAIN_STAT : baseInt;
       resetsThisLevel += burst + intResets;
+      mpResetsThisLevel += burst;
       phase = burst > 0 && intResets > 0 ? 'Stale HP Wash + Reset INT'
         : burst > 0 ? 'Stale HP Wash'
         : intResets > 0 ? 'Reset Base INT'
@@ -1090,22 +1146,29 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           hp = Math.min(MAX_HP, hp + staleHPWashYield(classData, washes));
           mp = Math.min(MAX_MP, mp - washCycleMPCost(classData, washes));  // never display above the cap
           resetsThisLevel = washes;
+          mpResetsThisLevel = washes;
         }
       }
     } else if (L < goals.targetLevel) {
-      const fresh = p.freshHPPerLevelPhase3;
       const stale = p.staleHPPerLevelPhase3 || 0;
+      const affordableResets = L < secondJALevel(classData)
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, Math.floor((mp - minMPAtLevel(classData, L)) / classData.mpLossPerReset));
+      const fresh = Math.min(5, phase3FreshRemaining, Math.max(0, affordableResets - stale));
       if (fresh > 0 || stale > 0) {
         phase = (fresh > 0 && stale > 0) ? 'Fresh + Stale HP Wash'
               : fresh > 0 ? 'Fresh HP Wash'
               : 'Stale HP Wash';
         if (L > currentState.level) {
-          hp += freshHPWashYield(classData, fresh) + staleHPWashYield(classData, stale);
+          hp = Math.min(MAX_HP, hp + freshHPWashYield(classData, fresh) + staleHPWashYield(classData, stale));
+          phase3FreshRemaining -= fresh;
+          freshHPWashesThisLevel = fresh;
           // `fresh` AP went to HP; the rest of the level's AP goes to Main Stat. The `fresh`
           // -MP +MainStat resets are the pair described in CONTEXT.md (Post-Swap Fresh HP Wash).
           mainStat += (5 - fresh) + fresh;
           mp -= washCycleMPCost(classData, fresh + stale);
           resetsThisLevel = fresh + stale;
+          mpResetsThisLevel = fresh + stale;
         }
       } else {
         phase = `Build ${classData.mainStat}`;
@@ -1121,24 +1184,38 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           hp = Math.min(MAX_HP, hp + staleHPWashYield(classData, washes));
           mp = Math.min(MAX_MP, mp - washCycleMPCost(classData, washes));  // never display above the cap
           resetsThisLevel = washes;
+          mpResetsThisLevel = washes;
         }
       }
     } else {
       // L == targetLevel. Phase 3 spans (mpWashStop, targetLevel] — 80 levels for a 120→200 plan —
       // so the target level's OWN fresh AP and paired resets belong here, not just the levels
       // below it.
-      const fresh = p.freshHPPerLevelPhase3;
       const stale = p.staleHPPerLevelPhase3 || 0;
-      if (L > currentState.level && (fresh > 0 || stale > 0)) {
-        hp += freshHPWashYield(classData, fresh) + staleHPWashYield(classData, stale);
-        mainStat += 5;
-        mp -= washCycleMPCost(classData, fresh + stale);
-        resetsThisLevel = fresh + stale;
-      }
+      const affordableResets = L < secondJALevel(classData)
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, Math.floor((mp - minMPAtLevel(classData, L)) / classData.mpLossPerReset));
+      const fresh = Math.min(5, phase3FreshRemaining, Math.max(0, affordableResets - stale));
       // When the Swap Level IS the target level, the swap event happens here — the burst and the
       // INT reset both land on this row (the branch above is skipped since L === targetLevel).
       // The target level is also the LAST MP-wash level, so apply its 5 -MP +X resets too.
       const swapHere = !p.capWash && L === p.mpWashStop;
+      if (!swapHere && L > currentState.level) {
+        if (fresh > 0 || stale > 0) {
+          hp = Math.min(MAX_HP, hp + freshHPWashYield(classData, fresh) + staleHPWashYield(classData, stale));
+          phase3FreshRemaining -= fresh;
+          freshHPWashesThisLevel = fresh;
+          mp -= washCycleMPCost(classData, fresh + stale);
+          resetsThisLevel = fresh + stale;
+          mpResetsThisLevel = fresh + stale;
+          phase = (fresh > 0 && stale > 0) ? 'Fresh + Stale HP Wash'
+            : fresh > 0 ? 'Fresh HP Wash'
+            : 'Stale HP Wash';
+        } else {
+          phase = `Build ${classData.mainStat}`;
+        }
+        mainStat += 5;
+      }
       if (swapHere && L > currentState.level) {
         if (p.mpWashStop > p.mpWashStart) {
           const resetsToInt = Math.min(5, Math.max(0, p.targetBaseInt - baseInt));
@@ -1146,6 +1223,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           mainStat += 5 - resetsToInt;
           mp += 5 * washCycleMP(classData, baseInt);
           resetsThisLevel += 5;
+          mpResetsThisLevel += 5;
         } else {
           const freshToInt = Math.min(5, Math.max(0, p.targetBaseInt - baseInt));
           baseInt += freshToInt;
@@ -1161,6 +1239,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       mainStat += intResetsHere;
       if (swapHere) baseInt = classData.requiresIntResetAtTarget ? STARTING_MAIN_STAT : baseInt;
       resetsThisLevel += burstHere + intResetsHere;
+      mpResetsThisLevel += burstHere;
       // Then top up to the HP Goal with whatever the swap burst didn't cover.
       const cleanupStale = p.cleanupStaleHPWash || 0;
       const hpShort = Math.max(0, goals.hpGoal - hp);
@@ -1168,13 +1247,16 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       hp = Math.min(MAX_HP, hp + staleHPWashYield(classData, extraStale));
       mp -= washCycleMPCost(classData, extraStale);
       resetsThisLevel += extraStale;
+      mpResetsThisLevel += extraStale;
       const swapPhase = burstHere > 0 && intResetsHere > 0 ? 'Stale HP Wash + Reset INT'
         : burstHere > 0 ? 'Stale HP Wash'
         : intResetsHere > 0 ? 'Reset Base INT'
         : '';
-      if (swapHere && extraStale > 0) phase = 'Stale HP Wash';
+      if (!swapHere && freshHPWashesThisLevel > 0 && extraStale > 0) phase = 'Fresh + Stale HP Wash';
+      else if (swapHere && extraStale > 0) phase = 'Stale HP Wash';
       else if (swapHere && swapPhase) phase = swapPhase;
-      else phase = extraStale > 0 ? 'Stale HP Wash' : 'Done';
+      else if (extraStale > 0) phase = 'Stale HP Wash';
+      else if (!phase) phase = 'Done';
     }
 
     cumulativeResets += resetsThisLevel;
@@ -1187,6 +1269,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       // Mages: Main Stat IS INT, so reflect it rather than tracking a separate counter.
       mainStat: Math.round(classData.isMage ? baseInt : mainStat),
       phase,
+      freshHPWashesThisLevel,
+      mpResetsThisLevel,
       resetsThisLevel,
       cumulativeResets,
     });
