@@ -254,8 +254,11 @@ const MAPLE_WARRIOR_LEVELS = [
 
 // Derived behaviour flags — computed once so the engine reads named fields instead of
 // re-deriving `mainStat === 'INT'` at every site. Source of truth stays `mainStat`.
-for (const cls of Object.values(CLASSES)) {
+for (const [className, cls] of Object.entries(CLASSES)) {
   cls.isMage = cls.mainStat === 'INT';
+  // Old-school MapleStory awards five extra AP at 3rd and 4th job advancement.
+  // Beginners never advance, so they receive only the normal five AP per level.
+  cls.advancementAPLevels = className === 'Beginner' ? [] : [70, 120];
   // At target level, non-Mages reset Base INT down to STARTING_MAIN_STAT (-INT +MainStat).
   // Mages skip this — INT is their Main Stat, the reset would be a no-op.
   cls.requiresIntResetAtTarget = !cls.isMage;

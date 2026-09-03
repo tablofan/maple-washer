@@ -34,6 +34,7 @@ const exportList = [
   'minMPAtLevel', 'minHPAtLevel', 'prepareInputs',
   'runPhase1', 'runPhase2', 'runPhase3', 'runCleanup',
   'washCycleMP', 'freshHPWashYield', 'staleHPWashYield', 'washCycleMPCost',
+  'freshAPAtLevel', 'freshAPInRange',
 ];
 fs.writeFileSync(tmpModule, classesSrc + '\n' + engineSrc + '\n' + `module.exports = { ${exportList.join(', ')} };`);
 process.on('exit', () => { try { fs.unlinkSync(tmpModule); } catch {} });
@@ -223,8 +224,8 @@ describe('Mid-progress shift mechanic', () => {
       goals: { hpGoal: 25000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 },
     });
     assertFeasible(r);
-    assertEq(r.apResets, 578, 'threshold-aware search keeps the cheapest joint strategy');
-    assertEq(r.params.targetBaseInt, 110, 'Target Base INT lands on an MP-gain threshold');
+    assertEq(r.apResets, 572, 'threshold-aware search uses the mixed advancement-level boundary');
+    assertEq(r.params.targetBaseInt, 120, 'Target Base INT lands on an MP-gain threshold');
   });
   test('Shift-to-INT search includes distant Base INT gain thresholds', () => {
     const r = plan({
@@ -233,8 +234,8 @@ describe('Mid-progress shift mechanic', () => {
       goals: { hpGoal: 20000, mpGoal: 4000, targetLevel: 180, swapLevel: 120 },
     });
     assertFeasible(r);
-    assertEq(r.apResets, 1424, 'complete threshold search keeps the cheaper pre-Swap strategy');
-    assertEq(r.breakdown.shift, 496, 'Base INT lands on the optimal distant threshold');
+    assertEq(r.apResets, 1384, 'complete threshold search keeps the cheaper mixed-boundary strategy');
+    assertEq(r.breakdown.shift, 476, 'Base INT lands on the optimal distant threshold');
   });
 });
 
@@ -301,6 +302,16 @@ describe('Unit tests for helpers', () => {
         assertTrue(bonus.level <= 30, `${className} has no 3rd/4th-job HP/MP bonus`);
       }
     }
+  });
+
+  test('3rd and 4th job advancements grant five extra allocatable AP', () => {
+    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 69), 5, 'ordinary level');
+    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 70), 10, '3rd job advancement');
+    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 120), 10, '4th job advancement');
+    assertEq(mod.freshAPInRange(CLASSES['Hero'], 69, 120), 265,
+      'range includes both five-AP advancement awards');
+    assertEq(mod.freshAPInRange(CLASSES['Beginner'], 69, 120), 255,
+      'Beginners do not receive job-advancement AP');
   });
 });
 
@@ -516,11 +527,11 @@ describe('Phase steps in isolation', () => {
     assertEq(p1.phase1EndInt, 54);
     assertTrue(p1.mpFromInt >= 0, 'INT-driven MP is non-negative');
   });
-  test('runPhase2 produces 5 AP Resets per level', () => {
+  test('runPhase2 includes the extra advancement AP at levels 70 and 120', () => {
     const params = { mpWashStart: 60, mpWashStop: 145, targetBaseInt: 300 };
     const phase1 = { phase1EndInt: 300 };  // already at target, plateau-only Phase 2
     const p2 = mod.runPhase2(CLASSES['Night Lord'], params, phase1, 40, 1.0);
-    assertEq(p2.phase2APResets, (145 - 60) * 5);
+    assertEq(p2.phase2APResets, mod.freshAPInRange(CLASSES['Night Lord'], 60, 145));
     assertEq(p2.intResetsInPhase2, 0, 'INT already at target');
     assertEq(p2.phase2PlateauLevels, 145 - 60, 'all Phase 2 is plateau');
   });
@@ -671,16 +682,22 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
     });
     assertFeasible(r);
-    assertEq(r.apResets, 651, 'pre-Swap washing reduces the reference plan cost');
-    assertEq(r.breakdown.mpWash, 100, '20 levels are MP Washed');
+    assertEq(r.apResets, 650, 'advancement AP and mixed-boundary washing reduce the plan cost');
+    assertEq(r.breakdown.mpWash, 89, 'the exact MP-Wash AP count is used');
     assertEq(r.breakdown.phase3Fresh, 355, '71 levels of fresh AP are washed into HP');
     assertEq(r.breakdown.staleHPWash, 0, 'fresh washes remove the need for stale washes');
 
     const rows = levelTable(CLASSES['Dark Knight'], r.__state, r.__goals, 40, 1.0, r);
-    for (let level = 65; level <= 134; level++) {
+    const transition = rows.find(x => x.level === 70);
+    assertEq(transition.phase, 'MP Wash + Pre-Swap Fresh HP Wash',
+      'level 70 is the mixed transition level');
+    assertEq(transition.mpWashesThisLevel, 4, 'four advancement-level AP go to MP');
+    assertEq(transition.freshHPWashesThisLevel, 6, 'six advancement-level AP go to HP');
+    for (let level = 71; level <= 134; level++) {
       const row = rows.find(x => x.level === level);
       assertEq(row.phase, 'Pre-Swap Fresh HP Wash', `lvl ${level} uses pre-Swap Fresh HP Wash`);
-      assertEq(row.freshHPWashesThisLevel, 5, `lvl ${level} uses all 5 fresh AP`);
+      assertEq(row.freshHPWashesThisLevel, mod.freshAPAtLevel(CLASSES['Dark Knight'], level),
+        `lvl ${level} uses every available fresh AP`);
     }
     assertEq(rows.find(x => x.level === 135).freshHPWashesThisLevel, 5,
       'Swap Level also uses all 5 fresh AP before resetting INT');
@@ -701,10 +718,12 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
           `lvl ${row.level} MP ${row.mp} stays above Minimum MP`);
       }
     }
-    assertEq(rows.find(x => x.level === 71).freshHPWashesThisLevel, 3,
-      'lvl 71 uses only the three affordable fresh washes');
-    assertEq(rows.find(x => x.level === 73).freshHPWashesThisLevel, 0,
-      'lvl 73 waits for MP to recover');
+    assertEq(rows.find(x => x.level === 70).freshHPWashesThisLevel, 10,
+      'lvl 70 uses all ten level-up and advancement AP');
+    assertEq(rows.find(x => x.level === 71).freshHPWashesThisLevel, 1,
+      'lvl 71 uses only the one remaining required fresh wash');
+    assertEq(rows.find(x => x.level === 72).freshHPWashesThisLevel, 0,
+      'lvl 72 has no remaining fresh wash to schedule');
     assertEq(rows.reduce((sum, row) => sum + row.freshHPWashesThisLevel, 0),
       r.breakdown.phase3Fresh, 'every planned fresh wash is eventually scheduled');
   });
@@ -741,7 +760,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
     const partial = phases.find(p => p.range === 'Lvl 71');
     assertTrue(Boolean(partial), 'partial wash level appears in Phase Plan');
-    assertTrue(/2 remaining fresh AP per level → LUK/.test(partial.action),
+    assertTrue(/4 remaining fresh AP per level → LUK/.test(partial.action),
       'partial wash level accounts for all five fresh AP');
   });
 
@@ -1026,6 +1045,57 @@ describe('Swap Level', () => {
     const rows = levelTable(CLASSES['Magician'], r.__state, r.__goals, 40, 1.0, r);
     assertTrue(rows.every(x => x.mainStat === x.baseInt),
       "Mage Main Stat (INT) tracks Base INT exactly");
+  });
+});
+
+// ────────────────────────── exact fresh-AP scheduling regressions ──────────────────────────
+
+describe('Exact fresh-AP scheduling', () => {
+  test('A transition level can split one AP into MP and four AP into HP', () => {
+    const r = plan({
+      class: 'Hero',
+      current: { level: 50, hp: 5000, mp: 29940, str: 100, dex: 4, luk: 4, baseInt: 100 },
+      goals: { hpGoal: 5274, mpGoal: 29950, targetLevel: 51, swapLevel: 51 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 101, 'one MP wash + four fresh HP washes + 96 INT resets');
+    assertEq(r.params.preSwapFreshAtBoundary, 4, 'four boundary AP switch to HP');
+    const row = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r).at(-1);
+    assertEq(row.mpWashesThisLevel, 1, 'one boundary AP MP-washes');
+    assertEq(row.freshHPWashesThisLevel, 4, 'four boundary AP fresh-HP-wash');
+    assertEq(row.peakMPThisLevel, 29971, 'the legal order remains below the MP cap');
+    assertEq(row.mp, 29951, 'the exact plan meets the MP goal');
+  });
+
+  test('A stale-wash plan first seeds the HP/MP Pool with a fresh HP allocation', () => {
+    const r = plan({
+      class: 'Hero',
+      current: { level: 50, hp: 5000, mp: 1000, str: 100, dex: 4, luk: 4, baseInt: 100 },
+      goals: { hpGoal: 5100, mpGoal: 900, targetLevel: 51, swapLevel: 51 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 97, 'one fresh wash and 96 INT resets beat two illegal stale washes');
+    assertEq(r.breakdown.phase3Fresh, 1, 'one AP seeds the shared pool');
+    assertEq(r.breakdown.staleHPWash, 0, 'no empty-pool stale wash is emitted');
+    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    assertTrue(rows.every(row => row.hpMPPoolValid), 'every stale-wash row has a prior pool seed');
+  });
+
+  test('The level-70 advancement AP can supply eleven fresh washes over two levels', () => {
+    const r = plan({
+      class: 'Hero',
+      current: { level: 69, hp: 5000, mp: 1000, str: 100, dex: 4, luk: 4, baseInt: 4 },
+      goals: { hpGoal: 5704, mpGoal: 900, targetLevel: 71, swapLevel: 69 },
+    });
+    assertFeasible(r);
+    assertEq(r.apResets, 11, 'all required HP comes from fresh washes');
+    assertEq(r.breakdown.phase3Fresh, 11, 'exact fresh-wash count');
+    assertEq(r.breakdown.staleHPWash, 0, 'no lower-yield stale washes are needed');
+    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    assertEq(rows.find(row => row.level === 70).freshHPWashesThisLevel, 10,
+      'level 70 exposes five level-up AP plus five advancement AP');
+    assertEq(rows.find(row => row.level === 71).freshHPWashesThisLevel, 1,
+      'the final wash uses one AP from the next level');
   });
 });
 
