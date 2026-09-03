@@ -37,7 +37,8 @@ const exportList = [
   'minMPAtLevel', 'minHPAtLevel', 'prepareInputs',
   'runPhase1', 'runPhase2', 'runPhase3', 'runCleanup',
   'washCycleMP', 'freshHPWashYield', 'staleHPWashYield', 'washCycleMPCost',
-  'freshAPAtLevel', 'freshAPInRange',
+  'freshAPAtLevel', 'freshAPInRange', 'firstJobAPNeeded',
+  'firstJobRequirementAPAtLevel', 'usableFreshAPAtLevel', 'usableFreshAPInRange',
 ];
 fs.writeFileSync(tmpModule, classesSrc + '\n' + engineSrc + '\n' + `module.exports = { ${exportList.join(', ')} };`);
 process.on('exit', () => { try { fs.unlinkSync(tmpModule); } catch {} });
@@ -107,6 +108,13 @@ function plan(opts) {
   if (opts.current && opts.current.mainStat !== undefined && classData.mainStat !== 'INT') {
     currentState[classData.mainStat.toLowerCase()] = opts.current.mainStat;
   }
+  // Most tests exercise washing mechanics rather than malformed historical characters. Keep
+  // their mid-progress fixtures legal unless a test calls optimize() directly to check rejection.
+  const requirement = classData.firstJobRequirement;
+  if (requirement && currentState.level >= requirement.level) {
+    const key = requirement.stat === 'INT' ? 'baseInt' : requirement.stat.toLowerCase();
+    currentState[key] = Math.max(currentState[key], requirement.minimum);
+  }
   delete currentState.mainStat;
   // Swap Level defaults to Target Level (the degenerate case where everything collapses at the
   // goal level). Tests that exercise a realistic plan pass an explicit swapLevel.
@@ -139,6 +147,12 @@ describe('Reference cases (Krythan-aligned)', () => {
     // Krythan's NL sheet defaults give ~2121 AP Resets; tightened from 1900-2500.
     assertInRange(r.apResets, 2000, 2400, 'AP Resets within ±10% of Krythan default ~2121');
     assertInRange(r.params.targetBaseInt, 300, 600, 'Target Base INT in Krythan-style range');
+    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    assertEq(rows.find(row => row.level === 10).firstJobStatValue, 25,
+      'the level schedule reaches the permanent 25 DEX thief requirement');
+    assertTrue(phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r)
+      .some(phase => phase.phase === 'First Job Requirement' && /25 DEX/.test(phase.action)),
+    'the phase plan tells the user about the thief requirement');
   });
 
   test('Hero (Warrior) fresh start to 30k HP / 2k MP at lvl 180', () => {
@@ -315,6 +329,67 @@ describe('Unit tests for helpers', () => {
       'range includes both five-AP advancement awards');
     assertEq(mod.freshAPInRange(CLASSES['Beginner'], 69, 120), 255,
       'Beginners do not receive job-advancement AP');
+  });
+
+  test('Every first-job family has the MapleLegends level and permanent stat requirement', () => {
+    const expected = {
+      'Night Lord': [10, 'DEX', 25], 'Shadower': [10, 'DEX', 25],
+      'Bowmaster': [10, 'DEX', 25], 'Marksman': [10, 'DEX', 25],
+      'Corsair': [10, 'DEX', 20], 'Buccaneer': [10, 'DEX', 20],
+      'Hero': [10, 'STR', 35], 'Dark Knight': [10, 'STR', 35],
+      'Paladin': [10, 'STR', 35], 'Magician': [8, 'INT', 20],
+    };
+    for (const [className, values] of Object.entries(expected)) {
+      const requirement = CLASSES[className].firstJobRequirement;
+      assertEq(requirement.level, values[0], `${className} advancement level`);
+      assertEq(requirement.stat, values[1], `${className} advancement stat`);
+      assertEq(requirement.minimum, values[2], `${className} advancement minimum`);
+    }
+    assertEq(CLASSES.Beginner.firstJobRequirement, null, 'Beginner has no requirement');
+  });
+
+  test('Required non-INT AP is reserved before washing while required Mage INT remains useful', () => {
+    const fresh = { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 13 };
+    const cases = [
+      ['Night Lord', 21, 24],
+      ['Bowmaster', 21, 24],
+      ['Buccaneer', 16, 29],
+      ['Hero', 31, 14],
+    ];
+    for (const [className, requiredAP, usableThroughAdvancement] of cases) {
+      const cls = CLASSES[className];
+      const advancementLevel = cls.firstJobRequirement.level;
+      const scheduled = Array.from({ length: advancementLevel - 1 }, (_, i) => i + 2)
+        .reduce((sum, level) => sum
+          + mod.firstJobRequirementAPAtLevel(cls, fresh, level), 0);
+      assertEq(mod.firstJobAPNeeded(cls, fresh), requiredAP, `${className} AP needed`);
+      assertEq(scheduled, requiredAP, `${className} AP scheduled by advancement`);
+      assertEq(mod.usableFreshAPInRange(cls, fresh, 1, advancementLevel),
+        usableThroughAdvancement, `${className} remaining AP budget`);
+    }
+    assertEq(mod.firstJobAPNeeded(CLASSES.Magician, fresh), 7, 'Mage needs 7 more INT');
+    assertEq(mod.usableFreshAPInRange(CLASSES.Magician, fresh, 1, 8), 35,
+      'Mage job INT remains part of the usable Base INT build');
+  });
+
+  test('An advanced character below its permanent first-job stat floor is rejected', () => {
+    const cases = [
+      ['Night Lord', { dex: 24 }, 'DEX cannot be below 25'],
+      ['Bowmaster', { dex: 24 }, 'DEX cannot be below 25'],
+      ['Buccaneer', { dex: 19 }, 'DEX cannot be below 20'],
+      ['Hero', { str: 34 }, 'STR cannot be below 35'],
+      ['Magician', { baseInt: 19 }, 'INT cannot be below 20'],
+    ];
+    for (const [className, stat, reason] of cases) {
+      const current = Object.assign(
+        { level: 30, hp: 1000, mp: 1000, str: 4, dex: 4, luk: 4, baseInt: 20 },
+        stat
+      );
+      const result = optimize(CLASSES[className], current,
+        { hpGoal: 10000, mpGoal: 5000, targetLevel: 180, swapLevel: 120 },
+        40, 1.0);
+      assertInfeasible(result, reason);
+    }
   });
 });
 
@@ -525,9 +600,10 @@ describe('Phase steps in isolation', () => {
     const cur = { level: 4, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const params = { mpWashStart: 14, shift: 0, targetBaseInt: 100 };  // 10 levels of Phase 1
     const p1 = mod.runPhase1(CLASSES['Night Lord'], cur, params, 0, 1.0);
-    // Phase 1 = 10 levels × 5 fresh AP = +50 INT. End INT = 4 + 50 = 54.
+    // Of the 50 fresh AP, 21 must first raise DEX from 4 to the permanent thief floor of 25.
+    // The remaining 29 build INT: 4 + 29 = 33.
     assertEq(p1.startBaseInt, 4);
-    assertEq(p1.phase1EndInt, 54);
+    assertEq(p1.phase1EndInt, 33);
     assertTrue(p1.mpFromInt >= 0, 'INT-driven MP is non-negative');
   });
   test('runPhase2 includes the extra advancement AP at levels 70 and 120', () => {
@@ -711,6 +787,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
   test('Fresh HP Washes wait when frontloading would cross Minimum MP', () => {
     const r = plan({
       class: 'Night Lord',
+      current: { baseInt: 13 },
       goals: { hpGoal: 8000, mpGoal: 2655, targetLevel: 180, swapLevel: 40 },
     });
     assertFeasible(r);
@@ -721,12 +798,12 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
           `lvl ${row.level} MP ${row.mp} stays above Minimum MP`);
       }
     }
-    assertEq(rows.find(x => x.level === 70).freshHPWashesThisLevel, 10,
-      'lvl 70 uses all ten level-up and advancement AP');
-    assertEq(rows.find(x => x.level === 71).freshHPWashesThisLevel, 1,
-      'lvl 71 uses only the one remaining required fresh wash');
-    assertEq(rows.find(x => x.level === 72).freshHPWashesThisLevel, 0,
-      'lvl 72 has no remaining fresh wash to schedule');
+    assertEq(rows.find(x => x.level === 70).freshHPWashesThisLevel, 9,
+      'lvl 70 leaves one AP unwashed to preserve Minimum MP');
+    assertEq(rows.find(x => x.level === 71).freshHPWashesThisLevel, 0,
+      'lvl 71 waits because another wash would cross Minimum MP');
+    assertEq(rows.find(x => x.level === 72).freshHPWashesThisLevel, 1,
+      'lvl 72 schedules the final wash after natural MP restores headroom');
     assertEq(rows.reduce((sum, row) => sum + row.freshHPWashesThisLevel, 0),
       r.breakdown.phase3Fresh, 'every planned fresh wash is eventually scheduled');
   });
@@ -757,11 +834,12 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
   test('Partial fresh-wash levels allocate remaining AP to Main Stat in the Phase Plan', () => {
     const r = plan({
       class: 'Night Lord',
+      current: { baseInt: 13 },
       goals: { hpGoal: 8000, mpGoal: 2655, targetLevel: 180, swapLevel: 40 },
     });
     assertFeasible(r);
     const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
-    const partial = phases.find(p => p.range === 'Lvl 71');
+    const partial = phases.find(p => p.range === 'Lvl 72');
     assertTrue(Boolean(partial), 'partial wash level appears in Phase Plan');
     assertTrue(/4 remaining fresh AP per level → LUK/.test(partial.action),
       'partial wash level accounts for all five fresh AP');
@@ -861,7 +939,7 @@ describe('4-stat shift budget', () => {
   });
 
   test('Optimizer can shift from a non-MainStat stat (e.g., DEX on a Night Lord)', () => {
-    // NL whose extras sit in DEX (not LUK). Pre-4-stat-change this was invisible to the optimizer.
+    // NL whose extras sit in DEX (not LUK). Only the amount above permanent 25 DEX is eligible.
     const r = plan({
       class: 'Night Lord',
       current: { level: 100, hp: 4000, mp: 1500, str: 4, dex: 400, luk: 4, baseInt: 4 },
@@ -870,7 +948,7 @@ describe('4-stat shift budget', () => {
     assertFeasible(r);
     assertTrue(r.breakdown.shift > 0, 'should shift some non-INT into INT');
     assertEq(r.breakdown.shiftDir, 'up');
-    assertTrue(r.breakdown.shift <= 396, `shift ${r.breakdown.shift} ≤ DEX budget 396`);
+    assertTrue(r.breakdown.shift <= 375, `shift ${r.breakdown.shift} ≤ DEX budget 375`);
   });
 
   test('Mage cannot do negative shift (INT-to-MainStat is a no-op for them)', () => {
@@ -1112,6 +1190,10 @@ describe('UI calculation trigger', () => {
       'runCalc should only appear in its declaration and the form submit handler');
     assertTrue(indexSrc.includes("classSelect.addEventListener('change', syncSwapVisibility);"),
       'changing class should still update class-specific field visibility');
+    assertTrue(/id="i-cur-int"[^>]*value="13"/.test(indexSrc),
+      'the fresh-character defaults use the 13 INT MapleLegends starting roll');
+    assertTrue(indexSrc.includes('id="i-first-job-hint"'),
+      'the selected class displays its first-job requirement');
     assertTrue(!indexSrc.includes('__calcDebounce'),
       'input changes should not schedule a debounced calculation');
   });
@@ -1215,7 +1297,7 @@ describe('Web Worker transport', () => {
   test('optimize reports progress over a bounded, monotone outer loop', () => {
     const updates = [];
     const r = optimize(CLASSES['Dark Knight'],
-      { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
+      { level: 40, hp: 1000, mp: 300, str: 35, dex: 4, luk: 4, baseInt: 200 },
       { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
       40, 1.0, p => updates.push(p));
     assertFeasible(r);

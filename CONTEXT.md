@@ -50,8 +50,11 @@ _Avoid_: INT gear, equip INT
 The combat stat each class scales damage from — STR (Warrior), DEX (Bowman/Pirate-Gunslinger), LUK (Thief), STR (Pirate-Brawler/Buccaneer), and **INT itself** (Magician). For Magicians, INT serves as both the washing currency *and* the **Main Stat**, which is why their wash is much simpler.
 _Avoid_: primary stat, attacking stat
 
+**First Job Requirement**:
+The Base Stat minimum required at first job advancement and retained permanently afterward: Warriors need 35 STR at level 10; Bowmen and Thieves need 25 DEX at level 10; Pirates need 20 DEX at level 10; Magicians need 20 INT at level 8. A fresh-character plan allocates these points first. Non-INT requirement points are removed from the AP available for INT-building and washing; Magician's required INT remains useful Base INT. The optimizer never treats these permanent points as available for **Shift to INT**.
+
 **Non-INT Stats Pool**:
-The user inputs current values for all four stats (STR, DEX, LUK, INT), each floored at the starting value of 4. For positive **Shift to INT**, the optimizer treats all non-INT stats (STR + DEX + LUK) as a single shift-budget pool — the player decides which specific stat(s) to draw from when executing the plan. At target level the **Reset Base INT** step collapses any returned INT back into the **Main Stat**, so non-MainStat stat points consumed by the wash are not preserved (the player can manually redistribute via Cash Shop afterward if desired).
+The user inputs current values for all four stats (STR, DEX, LUK, INT), normally floored at the starting value of 4 and additionally constrained by the class's permanent **First Job Requirement**. For positive **Shift to INT**, the optimizer treats eligible non-INT AP above those floors as a single shift-budget pool — the player decides which specific stat(s) to draw from when executing the plan. At target level the **Reset Base INT** step collapses any returned INT back into the **Main Stat**, so non-MainStat stat points consumed by the wash are not preserved (the player can manually redistribute via Cash Shop afterward if desired).
 _Avoid_: side stats, secondary stats
 
 **HP/MP Pool**:
@@ -94,10 +97,10 @@ _Avoid_: fresh wash toggle, HP wash mode
 
 **Phase Plan**:
 The level-banded sequence of allocation strategies the calculator outputs. Two shapes:
-- **Non-Mage:** *(optional)* pre-game **Shift to INT** → build **Base INT** → *(optional)* build **Main Stat** while retaining INT → *(optional)* **MP Wash** → *(optional)* **Pre-Swap Fresh HP Wash** while retaining INT → reset **Base INT** to **Main Stat** at **Swap Level** → *(optional)* **Post-Swap Fresh HP Wash** → *(optional)* cleanup **Stale HP Wash** at **Target Level**.
-- **Mage:** *(optional)* pre-game **Shift to INT** → build **Base INT** → **MP Wash** (drive MP to the goal) → **MP-Cap HP Wash** (hold MP at the goal, convert inflow to HP) to **Target Level**. **Magicians skip the Base-INT reset** because INT is already their Main Stat.
+- **Non-Mage:** *(optional)* pre-game **Shift to INT** → satisfy the **First Job Requirement** → build **Base INT** → *(optional)* build **Main Stat** while retaining INT → *(optional)* **MP Wash** → *(optional)* **Pre-Swap Fresh HP Wash** while retaining INT → reset **Base INT** to **Main Stat** at **Swap Level** → *(optional)* **Post-Swap Fresh HP Wash** → *(optional)* cleanup **Stale HP Wash** at **Target Level**.
+- **Mage:** *(optional)* pre-game **Shift to INT** → satisfy the 20 INT **First Job Requirement** as part of building **Base INT** → **MP Wash** (drive MP to the goal) → **MP-Cap HP Wash** (hold MP at the goal, convert inflow to HP) to **Target Level**. **Magicians skip the Base-INT reset** because INT is already their Main Stat.
 
-The pre-game Shift to INT can draw from any of the user's non-INT stats (STR/DEX/LUK) — the player picks the source.
+The pre-game Shift to INT can draw from any eligible non-INT stats (STR/DEX/LUK) above their permanent minimums — the player picks the source.
 
 ## Calculator behavior
 

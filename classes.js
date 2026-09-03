@@ -13,9 +13,18 @@ const CLASS_ORDER = [
   'Beginner',
 ];
 
+const FIRST_JOB_REQUIREMENTS = {
+  THIEF: { level: 10, stat: 'DEX', minimum: 25 },
+  BOWMAN: { level: 10, stat: 'DEX', minimum: 25 },
+  PIRATE: { level: 10, stat: 'DEX', minimum: 20 },
+  WARRIOR: { level: 10, stat: 'STR', minimum: 35 },
+  MAGICIAN: { level: 8, stat: 'INT', minimum: 20 },
+};
+
 const CLASSES = {
   'Night Lord': {
     mainStat: 'LUK',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.THIEF,
     naturalHPPerLevel: 22,
     naturalMPPerLevel: 15,
     freshAPHP: 18,
@@ -35,6 +44,7 @@ const CLASSES = {
   },
   'Shadower': {
     mainStat: 'LUK',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.THIEF,
     naturalHPPerLevel: 22,
     naturalMPPerLevel: 15,
     freshAPHP: 18,
@@ -54,6 +64,7 @@ const CLASSES = {
   },
   'Bowmaster': {
     mainStat: 'DEX',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.BOWMAN,
     naturalHPPerLevel: 22,
     naturalMPPerLevel: 15,
     freshAPHP: 18,
@@ -73,6 +84,7 @@ const CLASSES = {
   },
   'Marksman': {
     mainStat: 'DEX',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.BOWMAN,
     naturalHPPerLevel: 22,
     naturalMPPerLevel: 15,
     freshAPHP: 18,
@@ -92,6 +104,7 @@ const CLASSES = {
   },
   'Corsair': {
     mainStat: 'DEX',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.PIRATE,
     naturalHPPerLevel: 25,
     // Mid-range avg of 18-23 = 20.5; using 20 (floor) underestimates MP by ~0.5/lvl. Acceptable for V1.
     naturalMPPerLevel: 20,
@@ -112,6 +125,7 @@ const CLASSES = {
   },
   'Buccaneer': {
     mainStat: 'STR',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.PIRATE,
     // naturalHPPerLevel is the WITHOUT-MaxHP value; the +30 bonus from Improve Max HP
     // activates at maxHPActivatesAt. freshAPHP, by contrast, is the WITH-MaxHP value
     // (the +20 bonus on AP allocations is baked in). Same asymmetry for Warriors below.
@@ -135,6 +149,7 @@ const CLASSES = {
   },
   'Hero': {
     mainStat: 'STR',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,
     naturalMPPerLevel: 5,
     freshAPHP: 52,
@@ -154,6 +169,7 @@ const CLASSES = {
   },
   'Dark Knight': {
     mainStat: 'STR',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,
     naturalMPPerLevel: 5,
     freshAPHP: 52,
@@ -173,6 +189,7 @@ const CLASSES = {
   },
   'Paladin': {
     mainStat: 'STR',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,
     naturalMPPerLevel: 5,
     freshAPHP: 52,
@@ -192,6 +209,7 @@ const CLASSES = {
   },
   'Magician': {
     mainStat: 'INT',
+    firstJobRequirement: FIRST_JOB_REQUIREMENTS.MAGICIAN,
     naturalHPPerLevel: 12,
     naturalMPPerLevel: 23,
     freshAPHP: 8,
@@ -215,6 +233,7 @@ const CLASSES = {
   },
   'Beginner': {
     mainStat: 'STR',
+    firstJobRequirement: null,
     naturalHPPerLevel: 14,
     naturalMPPerLevel: 11,
     freshAPHP: 10,

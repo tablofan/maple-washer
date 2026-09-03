@@ -30,6 +30,64 @@ function freshAPInRange(classData, fromLevel, toLevel) {
   return total;
 }
 
+function baseStatValue(currentState, stat) {
+  return stat === 'INT'
+    ? currentState.baseInt
+    : (currentState[stat.toLowerCase()] ?? STARTING_MAIN_STAT);
+}
+
+// AP which must remain in the first-job stat is not available for INT-building or washing.
+// Schedule it as early as possible, matching the fresh-character route in Krythan's guides:
+// meet the advancement requirement first, then put the remaining AP into INT.
+function firstJobAPNeeded(classData, currentState) {
+  const requirement = classData.firstJobRequirement;
+  if (!requirement || currentState.level >= requirement.level) return 0;
+  return Math.max(0,
+    requirement.minimum - baseStatValue(currentState, requirement.stat));
+}
+
+function firstJobRequirementAPAtLevel(classData, currentState, level) {
+  const requirement = classData.firstJobRequirement;
+  if (!requirement || currentState.level >= requirement.level
+      || level <= currentState.level || level > requirement.level) return 0;
+  const needed = firstJobAPNeeded(classData, currentState);
+  const earnedBeforeLevel = freshAPInRange(classData, currentState.level, level - 1);
+  return Math.max(0, Math.min(freshAPAtLevel(classData, level), needed - earnedBeforeLevel));
+}
+
+function usableFreshAPAtLevel(classData, currentState, level) {
+  const requirement = classData.firstJobRequirement;
+  // A Magician's required INT is itself useful to the washing strategy, so those AP remain usable
+  // as Base INT. Every non-INT requirement is a permanent diversion from the strategy budget.
+  const reserved = requirement && requirement.stat !== 'INT'
+    ? firstJobRequirementAPAtLevel(classData, currentState, level)
+    : 0;
+  return freshAPAtLevel(classData, level) - reserved;
+}
+
+function usableFreshAPInRange(classData, currentState, fromLevel, toLevel) {
+  if (toLevel <= fromLevel) return 0;
+  const total = freshAPInRange(classData, fromLevel, toLevel);
+  const requirement = classData.firstJobRequirement;
+  if (!requirement || requirement.stat === 'INT'
+      || currentState.level >= requirement.level) return total;
+  const needed = firstJobAPNeeded(classData, currentState);
+  const allocatedThrough = level => Math.min(needed,
+    freshAPInRange(classData, currentState.level,
+      Math.min(requirement.level, Math.max(currentState.level, level))));
+  return total - Math.max(0, allocatedThrough(toLevel) - allocatedThrough(fromLevel));
+}
+
+function levelForUsableFreshAPCount(classData, currentState, fromLevel, toLevel, count) {
+  if (count <= 0) return fromLevel;
+  let remaining = count;
+  for (let level = fromLevel + 1; level <= toLevel; level++) {
+    remaining -= usableFreshAPAtLevel(classData, currentState, level);
+    if (remaining <= 0) return level;
+  }
+  return toLevel + 1;
+}
+
 // First level in (fromLevel, toLevel] whose cumulative fresh AP reaches `count`.
 function levelForFreshAPCount(classData, fromLevel, toLevel, count) {
   if (count <= 0) return fromLevel;
@@ -183,7 +241,7 @@ function sumIntTenths(start, count) {
 // For ramp ranges, this iterates per level using the same `+5 INT per level, capped at endInt`
 // rule that levelTable() applies — so the analytical sum here and the per-level walk in
 // levelTable always agree exactly. This is the contract that lets us drop the test tolerance.
-function intMPContribution(classData, fromLevel, toLevel, startInt, endInt, gearInt, mwMultiplier) {
+function intMPContribution(classData, fromLevel, toLevel, startInt, endInt, gearInt, mwMultiplier, currentState) {
   const levels = toLevel - fromLevel;
   if (levels <= 0) return 0;
 
@@ -209,7 +267,10 @@ function intMPContribution(classData, fromLevel, toLevel, startInt, endInt, gear
   for (let i = 1; i <= levels; i++) {
     const L = fromLevel + i;
     total += intMPPerLevel(intAtL, gearInt, mwMultiplier, L);
-    intAtL = Math.min(endInt, intAtL + freshAPAtLevel(classData, L));
+    const freshAP = currentState
+      ? usableFreshAPAtLevel(classData, currentState, L)
+      : freshAPAtLevel(classData, L);
+    intAtL = Math.min(endInt, intAtL + freshAP);
   }
   return total;
 }
@@ -225,17 +286,18 @@ function intMPContribution(classData, fromLevel, toLevel, startInt, endInt, gear
 function runPhase1(classData, currentState, params, gearInt, mwMultiplier) {
   const { mpWashStart, shift, targetBaseInt } = params;
   const startBaseInt = currentState.baseInt + shift;
-  const phase1FreshAP = freshAPInRange(classData, currentState.level, mpWashStart);
+  const phase1FreshAP = usableFreshAPInRange(classData, currentState,
+    currentState.level, mpWashStart);
   // For Mages Main Stat is INT, so there is no separate Main Stat destination to switch to.
   const phase1EndInt = classData.isMage
     ? startBaseInt + phase1FreshAP
     : Math.min(targetBaseInt, startBaseInt + phase1FreshAP);
   const freshAPToInt = Math.max(0, phase1EndInt - startBaseInt);
   const freshAPToMainStat = phase1FreshAP - freshAPToInt;
-  const phase1BuildEndLevel = levelForFreshAPCount(classData,
+  const phase1BuildEndLevel = levelForUsableFreshAPCount(classData, currentState,
     currentState.level, mpWashStart, freshAPToInt);
   const mpFromInt = intMPContribution(classData, currentState.level, mpWashStart,
-    startBaseInt, phase1EndInt, gearInt, mwMultiplier);
+    startBaseInt, phase1EndInt, gearInt, mwMultiplier, currentState);
   return { startBaseInt, phase1EndInt, freshAPToInt, freshAPToMainStat, phase1BuildEndLevel, mpFromInt };
 }
 
@@ -259,11 +321,13 @@ function zeroPhase2(phase1EndInt, targetBaseInt) {
   };
 }
 
-function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentLevel) {
+function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentStateOrLevel) {
   const { mpWashStart, mpWashStop, targetBaseInt } = params;
   const mpWashEnd = params.mpWashEnd ?? mpWashStop;
   const boundaryFresh = params.preSwapFreshAtBoundary || 0;
   const { phase1EndInt } = phase1;
+  const currentState = typeof currentStateOrLevel === 'object' ? currentStateOrLevel : null;
+  const currentLevel = currentState ? currentState.level : currentStateOrLevel;
 
   // MP Wash needs a level-up (fresh AP), so the level the character is ALREADY at yields nothing.
   // Wash levels are therefore (max(mpWashStart, currentLevel), mpWashEnd] — matching levelTable.
@@ -280,8 +344,15 @@ function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentLeve
     : Math.max(mpWashStart + 1, (currentLevel ?? mpWashStart) + 1);
   const phase2Levels = Math.max(0, mpWashEnd - firstWashingLevel + 1);
   const phase2FreshAP = phase2Levels > 0
-    ? freshAPInRange(classData, firstWashingLevel - 1, mpWashEnd) : 0;
-  const maxBoundaryFresh = phase2Levels > 0 ? freshAPAtLevel(classData, mpWashEnd) : 0;
+    ? (currentState
+      ? usableFreshAPInRange(classData, currentState, firstWashingLevel - 1, mpWashEnd)
+      : freshAPInRange(classData, firstWashingLevel - 1, mpWashEnd))
+    : 0;
+  const maxBoundaryFresh = phase2Levels > 0
+    ? (currentState
+      ? usableFreshAPAtLevel(classData, currentState, mpWashEnd)
+      : freshAPAtLevel(classData, mpWashEnd))
+    : 0;
   if (boundaryFresh < 0 || boundaryFresh > maxBoundaryFresh) {
     return { ...zeroPhase2(phase1EndInt, targetBaseInt), invalid: true };
   }
@@ -291,14 +362,17 @@ function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentLeve
   // go straight to INT and still complete the build. Non-Mages use boundary AP for HP instead.
   const directFreshToInt = classData.isMage ? boundaryFresh : 0;
   const mpWashIntResets = Math.max(0, intResetsInPhase2 - directFreshToInt);
-  const phase2BuildEndLevel = levelForFreshAPCount(classData,
-    firstWashingLevel - 1, mpWashEnd, intResetsInPhase2);
+  const phase2BuildEndLevel = currentState
+    ? levelForUsableFreshAPCount(classData, currentState,
+      firstWashingLevel - 1, mpWashEnd, intResetsInPhase2)
+    : levelForFreshAPCount(classData,
+      firstWashingLevel - 1, mpWashEnd, intResetsInPhase2);
   const phase2BuildLevels = intResetsInPhase2 > 0
     ? phase2BuildEndLevel - firstWashingLevel + 1 : 0;
   const phase2PlateauLevels = phase2Levels - phase2BuildLevels;
 
   const mpFromInt_build = intMPContribution(classData, mpWashStart, mpWashEnd,
-    phase1EndInt, targetBaseInt, gearInt, mwMultiplier);
+    phase1EndInt, targetBaseInt, gearInt, mwMultiplier, currentState);
   const mpFromInt_plateau = 0;
 
   // During an INT-building MP Wash, each fresh AP sees the Base INT from before its own
@@ -321,18 +395,21 @@ function runPhase2(classData, params, phase1, gearInt, mwMultiplier, currentLeve
 // After MP Washing ends, non-Mages can retain Base INT and use every fresh AP through the Swap
 // Level for Fresh HP Wash. Each allocation is paired with -MP +MainStat, so the character gains HP
 // and Main Stat while continuing to receive Base-INT level-up MP until the swap.
-function runPreSwapFresh(classData, params, gearInt, mwMultiplier) {
+function runPreSwapFresh(classData, params, gearInt, mwMultiplier, currentState) {
   const { mpWashStop, targetBaseInt } = params;
   const mpWashEnd = params.mpWashEnd ?? mpWashStop;
   const boundaryFresh = params.preSwapFreshAtBoundary || 0;
   const swapSeedFresh = params.swapSeedFreshHPResets || 0;
-  const preSwapFreshHPResets = freshAPInRange(classData, mpWashEnd, mpWashStop)
+  const freshAP = currentState
+    ? usableFreshAPInRange(classData, currentState, mpWashEnd, mpWashStop)
+    : freshAPInRange(classData, mpWashEnd, mpWashStop);
+  const preSwapFreshHPResets = freshAP
     + boundaryFresh + swapSeedFresh;
   return {
     preSwapFreshHPResets,
     hpFromFresh: freshHPWashYield(classData, preSwapFreshHPResets),
     mpFromInt: intMPContribution(classData, mpWashEnd, mpWashStop,
-      targetBaseInt, targetBaseInt, gearInt, mwMultiplier),
+      targetBaseInt, targetBaseInt, gearInt, mwMultiplier, currentState),
     mpFromResets: -washCycleMPCost(classData, preSwapFreshHPResets),
   };
 }
@@ -343,7 +420,7 @@ function runPreSwapFresh(classData, params, gearInt, mwMultiplier) {
 // `staleHPPerLevelPhase3` -MP+HP resets. Both drain MP via reset cost.
 //
 // Base INT is STARTING_MAIN_STAT throughout Phase 3 — the reset to MainStat happened AT the swap.
-function runPhase3(classData, params, goals, gearInt, mwMultiplier) {
+function runPhase3(classData, params, goals, gearInt, mwMultiplier, currentState) {
   const { mpWashStop, phase3FreshHPResets = 0, staleHPPerLevelPhase3 = 0 } = params;
   const phase3Levels = goals.targetLevel - mpWashStop;
   const phase3StaleHPResets = phase3Levels * staleHPPerLevelPhase3;
@@ -351,7 +428,7 @@ function runPhase3(classData, params, goals, gearInt, mwMultiplier) {
   const hpFromFresh = freshHPWashYield(classData, phase3FreshHPResets);
   const hpFromStale = staleHPWashYield(classData, phase3StaleHPResets);
   const mpFromInt = intMPContribution(classData, mpWashStop, goals.targetLevel,
-    STARTING_MAIN_STAT, STARTING_MAIN_STAT, gearInt, mwMultiplier);
+    STARTING_MAIN_STAT, STARTING_MAIN_STAT, gearInt, mwMultiplier, currentState);
   const mpFromResets = -washCycleMPCost(classData, phase3FreshHPResets + phase3StaleHPResets);
 
   return {
@@ -435,7 +512,7 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
   if (p1.phase1EndInt > targetBaseInt) return { feasible: false, reason: 'phase 1 overshoots target INT' };
 
   // --- Phase 2 ---
-  const p2 = runPhase2(classData, params, p1, gearInt, mwMultiplier, currentState.level);
+  const p2 = runPhase2(classData, params, p1, gearInt, mwMultiplier, currentState);
   // No reason: this is a per-candidate detail (a given Target Base INT simply doesn't fit the
   // window). Surfacing it would mask the real binding constraint reported by optimize().
   if (p2.invalid || p2.mpWashIntResets > p2.phase2APResets) return { feasible: false };
@@ -449,18 +526,19 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
       return { feasible: false, reason: 'invalid swap-level HP/MP Pool seed' };
     }
     const intBeforeSwap = Math.min(targetBaseInt, startBaseInt
-      + freshAPInRange(classData, currentState.level, mpWashStop - 1));
-    const directAPAtSwap = freshAPAtLevel(classData, mpWashStop)
+      + usableFreshAPInRange(classData, currentState,
+        currentState.level, mpWashStop - 1));
+    const directAPAtSwap = usableFreshAPAtLevel(classData, currentState, mpWashStop)
       - Math.max(0, targetBaseInt - intBeforeSwap);
     if (directAPAtSwap < swapSeedFresh) {
       return { feasible: false, reason: 'no free swap-level AP is available to seed the HP/MP Pool' };
     }
   }
 
-  const preSwap = runPreSwapFresh(classData, params, gearInt, mwMultiplier);
+  const preSwap = runPreSwapFresh(classData, params, gearInt, mwMultiplier, currentState);
 
   // --- Phase 3 ---
-  const p3 = runPhase3(classData, params, goals, gearInt, mwMultiplier);
+  const p3 = runPhase3(classData, params, goals, gearInt, mwMultiplier, currentState);
 
   // MP banked at the Swap Level (end of Phase 2) — before any swap burst.
   const minMPAtStop = minMPAtLevel(classData, mpWashStop);
@@ -481,14 +559,14 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
   // following level, whose fresh-AP MP gain can legitimately lift them above Minimum MP.
   if (!classData.isMage && p2.phase2APResets > 0) {
     const firstWashLevel = mpWashStart + 1;
-    const firstWashCount = Math.min(freshAPAtLevel(classData, firstWashLevel),
+    const firstWashCount = Math.min(usableFreshAPAtLevel(classData, currentState, firstWashLevel),
       p2.phase2APResets);
     const mpBeforeFirstWash = currentState.mp
       + ranges.naturalMPInRange(currentState.level, firstWashLevel)
       + ranges.jaMPInRange(currentState.level, firstWashLevel)
       + p1.mpFromInt
       + intMPContribution(classData, mpWashStart, firstWashLevel,
-        p1.phase1EndInt, targetBaseInt, gearInt, mwMultiplier);
+        p1.phase1EndInt, targetBaseInt, gearInt, mwMultiplier, currentState);
     const firstBuildCycles = Math.min(firstWashCount, p2.mpWashIntResets);
     const firstWashNet = firstBuildCycles
         * (classData.freshAPMPBase - classData.mpLossPerReset)
@@ -518,12 +596,12 @@ function evaluateStrategy(classData, currentState, goals, gearInt, mwMultiplier,
       + ranges.naturalMPInRange(mpWashEnd, level)
       + ranges.jaMPInRange(mpWashEnd, level)
       + intMPContribution(classData, mpWashEnd, level,
-        targetBaseInt, targetBaseInt, gearInt, mwMultiplier)
+        targetBaseInt, targetBaseInt, gearInt, mwMultiplier, currentState)
       // At the boundary itself, the peak is observed before its Fresh HP paired resets. At later
       // levels those boundary resets and every completed intervening level have already drained MP.
       - washCycleMPCost(classData, level === mpWashEnd ? 0
         : (params.preSwapFreshAtBoundary || 0)
-          + freshAPInRange(classData, mpWashEnd, level - 1))
+          + usableFreshAPInRange(classData, currentState, mpWashEnd, level - 1))
   ));
 
   // HP accumulated by the swap from natural growth and the optional pre-Swap fresh phase.
@@ -680,7 +758,7 @@ function evaluateCapWash(classData, currentState, goals, gearInt, mwMultiplier, 
 
   const p1 = phase1Cache || runPhase1(classData, currentState, params, gearInt, mwMultiplier);
   if (p1.phase1EndInt > targetBaseInt) return { feasible: false, reason: 'phase 1 overshoots target INT' };
-  const p2 = runPhase2(classData, params, p1, gearInt, mwMultiplier, currentState.level);
+  const p2 = runPhase2(classData, params, p1, gearInt, mwMultiplier, currentState);
   // No reason: per-candidate detail. optimize() reports the real binding constraint.
   if (p2.invalid || p2.mpWashIntResets > p2.phase2APResets) return { feasible: false };
 
@@ -708,11 +786,12 @@ function evaluateCapWash(classData, currentState, goals, gearInt, mwMultiplier, 
   // --- Phase 3: cap HP wash. All Phase 3 MP inflow is generated then converted to HP. ---
   const phase3Levels = goals.targetLevel - mpWashStop;
   // Fresh AP → MP (5/level), gross gain per AP = freshAPMPBase + floor(Base INT / 10) (no gear/MW on AP assignment).
-  const phase3FreshAPtoMP = freshAPInRange(classData, mpWashStop, goals.targetLevel)
+  const phase3FreshAPtoMP = usableFreshAPInRange(classData, currentState,
+    mpWashStop, goals.targetLevel)
     * (classData.freshAPMPBase + Math.floor(targetBaseInt / 10));
   const phase3Natural = ranges.naturalMPInRange(mpWashStop, goals.targetLevel);
   const phase3Int = intMPContribution(classData, mpWashStop, goals.targetLevel,
-    targetBaseInt, targetBaseInt, gearInt, mwMultiplier);
+    targetBaseInt, targetBaseInt, gearInt, mwMultiplier, currentState);
   const grossMP = mpAtCap + phase3FreshAPtoMP + phase3Natural + phase3Int;
 
   if (grossMP < goals.mpGoal) {
@@ -826,6 +905,26 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
   if (currentState.level >= goals.targetLevel) {
     return { feasible: false, reason: `Target Level (${goals.targetLevel}) must be greater than Current Level (${currentState.level}).` };
   }
+  const firstJobRequirement = classData.firstJobRequirement;
+  if (firstJobRequirement) {
+    const currentRequiredStat = baseStatValue(currentState, firstJobRequirement.stat);
+    if (currentState.level >= firstJobRequirement.level
+        && currentRequiredStat < firstJobRequirement.minimum) {
+      return {
+        feasible: false,
+        reason: `${firstJobRequirement.stat} cannot be below ${firstJobRequirement.minimum} after the level ${firstJobRequirement.level} first job advancement.`,
+      };
+    }
+    if (currentState.level < firstJobRequirement.level
+        && currentRequiredStat
+          + freshAPInRange(classData, currentState.level, firstJobRequirement.level)
+          < firstJobRequirement.minimum) {
+      return {
+        feasible: false,
+        reason: `There is not enough AP remaining to reach ${firstJobRequirement.minimum} ${firstJobRequirement.stat} by the level ${firstJobRequirement.level} first job advancement.`,
+      };
+    }
+  }
   const minMPAtTarget = minMPAtLevel(classData, goals.targetLevel);
   if (goals.mpGoal < minMPAtTarget) {
     return { feasible: false, reason: `MP Goal (${goals.mpGoal}) is below the minimum possible MP (${minMPAtTarget}) at level ${goals.targetLevel} for a ${classData.isMage ? 'Magician' : 'character of this class'}.` };
@@ -844,23 +943,32 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
     }
   }
   const remainingLevels = goals.targetLevel - currentState.level;
-  // Positive-shift budget = sum of non-INT stats above starting. The optimizer doesn't care which specific
-  // non-INT stat is the source — the player chooses (and accepts the consume-into-MainStat collapse at target).
+  // Positive-shift budget = non-INT AP above the permanent class floors. The required first-job
+  // stat cannot be reset below its advancement minimum after the job has been taken.
   const str = currentState.str ?? STARTING_MAIN_STAT;
   const dex = currentState.dex ?? STARTING_MAIN_STAT;
   const luk = currentState.luk ?? STARTING_MAIN_STAT;
+  const statFloor = stat => firstJobRequirement && firstJobRequirement.stat === stat
+    ? firstJobRequirement.minimum
+    : STARTING_MAIN_STAT;
   const maxPositiveShift = Math.max(0,
-    (str - STARTING_MAIN_STAT) + (dex - STARTING_MAIN_STAT) + (luk - STARTING_MAIN_STAT)
+    Math.max(0, str - statFloor('STR'))
+      + Math.max(0, dex - statFloor('DEX'))
+      + Math.max(0, luk - statFloor('LUK'))
   );
   // Precompute range sums (these depend only on class + currentLevel + targetLevel, not strategy).
   const ranges = precomputeRanges(classData, currentState.level, goals.targetLevel);
 
   // Existing Base INT stays in place until the Swap Level. Moving it to Main Stat earlier costs
   // the same reset as the eventual swap while discarding its INT-based MP gain, so it is dominated.
-  const intMin = currentState.baseInt;
+  const intMin = firstJobRequirement && firstJobRequirement.stat === 'INT'
+      && goals.targetLevel >= firstJobRequirement.level
+    ? Math.max(currentState.baseInt, firstJobRequirement.minimum)
+    : currentState.baseInt;
   // Cap: largest INT we could reach via shift-up + all fresh AP. No reason to go higher.
   const intMax = Math.min(2000, currentState.baseInt + maxPositiveShift
-    + freshAPInRange(classData, currentState.level, goals.targetLevel));
+    + usableFreshAPInRange(classData, currentState,
+      currentState.level, goals.targetLevel));
   const intStep = 5;
 
   let best = null;
@@ -970,7 +1078,8 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
     const idealShift = targetBaseInt - currentState.baseInt;
     // shift ∈ [minShift, maxShift]. minShift covers "fit phase 1 within remainingLevels"; maxShift covers "fit phase 1 ≥ 0".
     const minShift = Math.max(0, idealShift
-      - freshAPInRange(classData, currentState.level, goals.targetLevel));
+      - usableFreshAPInRange(classData, currentState,
+        currentState.level, goals.targetLevel));
     const maxShift = Math.min(maxPositiveShift, idealShift);
     if (minShift > maxShift) continue;
 
@@ -1001,7 +1110,7 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
 
       // Phase 1 length needed via fresh AP (after shift).
       const phase1IntNeeded = targetBaseInt - adjustedStart;
-      const naturalMPWashStart = levelForFreshAPCount(classData,
+      const naturalMPWashStart = levelForUsableFreshAPCount(classData, currentState,
         currentState.level, goals.targetLevel, phase1IntNeeded);
       const phase1FreshLevels = naturalMPWashStart - currentState.level;
 
@@ -1044,7 +1153,7 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
             // The final MP-Wash level may use only a subset of its AP for MP. Any remainder goes
             // directly to INT, avoiding an otherwise artificial whole-level overshoot of 30k MP.
             const boundaryCapacity = mpWashStop > mpWashStart
-              ? freshAPAtLevel(classData, mpWashStop) : 0;
+              ? usableFreshAPAtLevel(classData, currentState, mpWashStop) : 0;
             for (let preSwapFreshAtBoundary = 0;
               preSwapFreshAtBoundary <= boundaryCapacity; preSwapFreshAtBoundary++) {
               consider(evaluateCapWash(classData, currentState, goals, gearInt, mwMultiplier, {
@@ -1058,12 +1167,14 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
           // use all fresh AP for HP while retaining Base INT, then the post-swap phase uses the exact
           // number of additional Fresh HP Washes needed.
           const phase3Levels = goals.targetLevel - mpWashStop;
-          const maxFresh = freshAPInRange(classData, mpWashStop, goals.targetLevel);
+          const maxFresh = usableFreshAPInRange(classData, currentState,
+            mpWashStop, goals.targetLevel);
           const maxStale = mpWashStop >= goals.targetLevel ? 0 : 5;
           const phase3IntMP = intMPContribution(classData, mpWashStop, goals.targetLevel,
-            STARTING_MAIN_STAT, STARTING_MAIN_STAT, gearInt, mwMultiplier);
-          const earliestMPWashEnd = levelForFreshAPCount(classData, mpWashStart,
-            mpWashStop, Math.max(0, targetBaseInt - phase1Cache.phase1EndInt));
+            STARTING_MAIN_STAT, STARTING_MAIN_STAT, gearInt, mwMultiplier, currentState);
+          const earliestMPWashEnd = levelForUsableFreshAPCount(classData, currentState,
+            mpWashStart, mpWashStop,
+            Math.max(0, targetBaseInt - phase1Cache.phase1EndInt));
           if (earliestMPWashEnd > mpWashStop) continue;
           for (let staleHPPerLevelPhase3 = 0; staleHPPerLevelPhase3 <= maxStale; staleHPPerLevelPhase3++) {
             const phase3StaleHPResets = phase3Levels * staleHPPerLevelPhase3;
@@ -1088,8 +1199,9 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
               targetBaseInt, mpWashStart, mpWashEnd: hpBoundaryEnd, mpWashStop, shift,
             };
             const boundaryP2 = runPhase2(classData, boundaryBase,
-              phase1Cache, gearInt, mwMultiplier, currentState.level);
-            const boundaryPreSwap = runPreSwapFresh(classData, boundaryBase, gearInt, mwMultiplier);
+              phase1Cache, gearInt, mwMultiplier, currentState);
+            const boundaryPreSwap = runPreSwapFresh(classData, boundaryBase,
+              gearInt, mwMultiplier, currentState);
             const boundaryPostFresh = Math.max(0, Math.min(maxFresh,
               totalFreshNeeded - boundaryPreSwap.preSwapFreshHPResets));
             const boundaryStaleNeeded = Math.ceil(Math.max(0, goals.hpGoal
@@ -1129,8 +1241,9 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
               // MP cap, where a split can also be required to avoid a transient overflow, inspect
               // every AP count on the boundary.
               const maxBoundaryFresh = mpWashEnd > mpWashStart
-                ? freshAPAtLevel(classData, mpWashEnd) - 1 : 0;
-              const basePreSwapFresh = freshAPInRange(classData, mpWashEnd, mpWashStop);
+                ? usableFreshAPAtLevel(classData, currentState, mpWashEnd) - 1 : 0;
+              const basePreSwapFresh = usableFreshAPInRange(classData, currentState,
+                mpWashEnd, mpWashStop);
               const minimumBoundaryForHP = Math.max(0, Math.min(maxBoundaryFresh,
                 totalFreshNeeded - basePreSwapFresh - maxFresh));
               const boundaryCandidates = new Set([0]);
@@ -1141,7 +1254,7 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
                 preSwapFreshAtBoundary: 0,
               };
               const zeroBoundaryP2 = runPhase2(classData, zeroBoundaryBase,
-                phase1Cache, gearInt, mwMultiplier, currentState.level);
+                phase1Cache, gearInt, mwMultiplier, currentState);
               const mpAtEndWithoutSplit = currentState.mp
                 + ranges.naturalMPInRange(currentState.level, mpWashEnd)
                 + ranges.jaMPInRange(currentState.level, mpWashEnd)
@@ -1149,7 +1262,8 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
                 + zeroBoundaryP2.mpFromInt_build + zeroBoundaryP2.mpFromInt_plateau
                 + zeroBoundaryP2.mpFromMPWash_build + zeroBoundaryP2.mpFromMPWash_plateau;
               const boundaryGrossMP = classData.freshAPMPBase + Math.floor(targetBaseInt / 10);
-              const requiresExhaustiveBoundary = freshAPAtLevel(classData, mpWashEnd) > 5
+              const requiresExhaustiveBoundary = usableFreshAPAtLevel(classData,
+                currentState, mpWashEnd) > 5
                 || mpAtEndWithoutSplit > MAX_MP - maxBoundaryFresh * boundaryGrossMP;
               if (requiresExhaustiveBoundary) {
                 for (let count = 0; count <= maxBoundaryFresh; count++) {
@@ -1163,10 +1277,11 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
                   preSwapFreshAtBoundary,
                 };
                 const p2WithoutSeed = runPhase2(classData, base,
-                  phase1Cache, gearInt, mwMultiplier, currentState.level);
+                  phase1Cache, gearInt, mwMultiplier, currentState);
                 if (p2WithoutSeed.invalid
                     || p2WithoutSeed.mpWashIntResets > p2WithoutSeed.phase2APResets) continue;
-                const preSwapWithoutSeed = runPreSwapFresh(classData, base, gearInt, mwMultiplier);
+                const preSwapWithoutSeed = runPreSwapFresh(classData, base,
+                  gearInt, mwMultiplier, currentState);
                 const canUseSwapSeed = p2WithoutSeed.phase2APResets === 0
                   && preSwapWithoutSeed.preSwapFreshHPResets === 0
                   && mpWashStart === mpWashStop && mpWashStop > currentState.level;
@@ -1175,8 +1290,9 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
                 for (const swapSeedFreshHPResets of seedCandidates) {
                   const strategyBase = { ...base, swapSeedFreshHPResets };
                   const p2ForFreshCandidates = runPhase2(classData, strategyBase,
-                    phase1Cache, gearInt, mwMultiplier, currentState.level);
-                  const preSwap = runPreSwapFresh(classData, strategyBase, gearInt, mwMultiplier);
+                    phase1Cache, gearInt, mwMultiplier, currentState);
+                  const preSwap = runPreSwapFresh(classData, strategyBase,
+                    gearInt, mwMultiplier, currentState);
                   const hpBeforeFresh = hpWithoutFresh + preSwap.hpFromFresh;
                   const idealFresh = (goals.hpGoal - hpBeforeFresh) / classData.freshAPHP;
                   const mpBeforePhase3Resets = currentState.mp + ranges.mpNaturalBase + ranges.mpJA
@@ -1276,7 +1392,7 @@ function phasePlan(classData, currentState, goals, result) {
   if (mpWashSchedule.size === 0 && b.mpWash > 0) {
     let remaining = b.mpWash;
     for (let level = p.mpWashFirstLevel; level <= mpWashEnd && remaining > 0; level++) {
-      const count = Math.min(freshAPAtLevel(classData, level), remaining);
+      const count = Math.min(usableFreshAPAtLevel(classData, currentState, level), remaining);
       mpWashSchedule.set(level, count);
       remaining -= count;
     }
@@ -1288,7 +1404,8 @@ function phasePlan(classData, currentState, goals, result) {
       preSwapFreshSchedule.set(mpWashEnd, p.preSwapFreshAtBoundary);
     }
     for (let level = mpWashEnd + 1; level <= p.mpWashStop; level++) {
-      preSwapFreshSchedule.set(level, freshAPAtLevel(classData, level));
+      preSwapFreshSchedule.set(level,
+        usableFreshAPAtLevel(classData, currentState, level));
     }
     if ((p.swapSeedFreshHPResets || 0) > 0) {
       preSwapFreshSchedule.set(p.mpWashStop,
@@ -1302,15 +1419,24 @@ function phasePlan(classData, currentState, goals, result) {
   if (b.shift > 0 && b.shiftDir === 'up') {
     phases.push({
       range: `Before levelling`,
-      action: `AP Reset ${b.shift} times: -<STR/DEX/LUK> +INT (mid-progress shift; you choose which non-INT stat(s) to draw from).`,
+      action: `AP Reset ${b.shift} times: -<STR/DEX/LUK> +INT (draw only from points above the permanent first-job stat floor).`,
       phase: 'Shift to INT',
+    });
+  }
+  const requiredJobAP = firstJobAPNeeded(classData, currentState);
+  if (requiredJobAP > 0) {
+    const requirement = classData.firstJobRequirement;
+    phases.push({
+      range: `By Lvl ${requirement.level}`,
+      action: `Allocate ${requiredJobAP} fresh AP to ${requirement.stat} first, reaching the permanent ${requirement.minimum} ${requirement.stat} required for first job advancement. The remaining fresh AP follow the plan below.`,
+      phase: 'First Job Requirement',
     });
   }
   const fromInt = currentState.baseInt + b.shift;
   if (p.phase1BuildEndLevel > currentState.level && p.phase1EndInt > fromInt) {
     phases.push({
       range: `Lvl ${currentState.level} → ${p.phase1BuildEndLevel}`,
-      action: `Allocate fresh AP to INT until Base INT reaches ${p.phase1EndInt}; put any remaining AP into ${classData.mainStat}.`,
+      action: `After any first-job requirement AP, allocate remaining fresh AP to INT until Base INT reaches ${p.phase1EndInt}; put any remainder into ${classData.mainStat}.`,
       phase: 'Build Base INT',
     });
   }
@@ -1402,7 +1528,7 @@ function phasePlan(classData, currentState, goals, result) {
     if (scheduledFresh.size === 0 && p.phase3FreshHPResets > 0) {
       let remaining = p.phase3FreshHPResets;
       for (let level = phase3Start; level <= goals.targetLevel && remaining > 0; level++) {
-        const count = Math.min(freshAPAtLevel(classData, level), remaining);
+        const count = Math.min(usableFreshAPAtLevel(classData, currentState, level), remaining);
         scheduledFresh.set(level, count);
         remaining -= count;
       }
@@ -1411,7 +1537,7 @@ function phasePlan(classData, currentState, goals, result) {
     for (let level = phase3Start; level <= goals.targetLevel; level++) {
       const count = scheduledFresh.get(level) || 0;
       const last = groups[groups.length - 1];
-      const available = freshAPAtLevel(classData, level);
+      const available = usableFreshAPAtLevel(classData, currentState, level);
       if (last && last.count === count && last.available === available) last.end = level;
       else groups.push({ start: level, end: level, count, available });
     }
@@ -1466,6 +1592,10 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
   let mainStat = classData.isMage
     ? baseInt
     : (currentState[classData.mainStat.toLowerCase()] ?? STARTING_MAIN_STAT);
+  const firstJobRequirement = classData.firstJobRequirement;
+  let firstJobStatValue = firstJobRequirement
+    ? baseStatValue(currentState, firstJobRequirement.stat)
+    : null;
   let cumulativeResets = result.breakdown.shift;  // pre-game shift counted at level 0
   let phase2MPRemaining = result.breakdown.mpWash;
   let preSwapFreshRemaining = p.preSwapFreshHPResets || 0;
@@ -1483,6 +1613,20 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
     let mpWashesThisLevel = 0;
     let phase = '';
     let peakMPThisLevel = mp;
+    const firstJobAPThisLevel = L > currentState.level
+      ? firstJobRequirementAPAtLevel(classData, currentState, L)
+      : 0;
+    const usableFreshAP = L > currentState.level
+      ? usableFreshAPAtLevel(classData, currentState, L)
+      : 0;
+
+    if (firstJobRequirement && firstJobRequirement.stat !== 'INT'
+        && firstJobAPThisLevel > 0) {
+      firstJobStatValue += firstJobAPThisLevel;
+      if (firstJobRequirement.stat === classData.mainStat) {
+        mainStat += firstJobAPThisLevel;
+      }
+    }
 
     if (L > currentState.level) {
       // Natural HP/MP gain on level-up to L. Gear is worn iff L >= GEAR_WORN_FROM_LEVEL.
@@ -1505,7 +1649,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
     const inPhase1 = classData.isMage ? L < p.mpWashStart : L <= p.mpWashStart;
     if (inPhase1 && L < p.mpWashStop) {
       if (L > currentState.level) {
-        const freshAP = freshAPAtLevel(classData, L);
+        const freshAP = usableFreshAP;
         const freshToInt = Math.min(freshAP, Math.max(0, p.targetBaseInt - baseInt));
         baseInt += freshToInt;
         mainStat += freshAP - freshToInt;
@@ -1515,7 +1659,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       }
     } else if (L < p.mpWashStop || (classData.isMage && L === p.mpWashStop)) {
       if (L > currentState.level) {
-        const freshAP = freshAPAtLevel(classData, L);
+        const freshAP = usableFreshAP;
         const mpWashes = Math.min(freshAP, phase2MPRemaining);
         for (let cycle = 0; cycle < mpWashes; cycle++) {
           const gross = classData.freshAPMPBase + Math.floor(baseInt / 10);
@@ -1559,7 +1703,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       let pendingFreshResets = 0;
       let pendingMPResetToInt = false;
       if (L > currentState.level) {
-        const freshAP = freshAPAtLevel(classData, L);
+        const freshAP = usableFreshAP;
         swapMPWashes = Math.min(freshAP, phase2MPRemaining);
         swapFresh = Math.min(freshAP - swapMPWashes, preSwapFreshRemaining);
 
@@ -1627,7 +1771,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       // MP above the goal into HP via -MP +HP, holding MP at the cap.
       phase = 'MP-Cap HP Wash';
       if (L > currentState.level) {
-        const freshAP = freshAPAtLevel(classData, L);
+        const freshAP = usableFreshAP;
         mp += freshAP * (classData.freshAPMPBase + Math.floor(baseInt / 10));
         peakMPThisLevel = Math.max(peakMPThisLevel, mp);
         hpMPPoolSeeded = freshAP > 0;
@@ -1642,7 +1786,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       }
     } else if (L < goals.targetLevel) {
       const stale = p.staleHPPerLevelPhase3 || 0;
-      const freshAP = L > currentState.level ? freshAPAtLevel(classData, L) : 0;
+      const freshAP = usableFreshAP;
       const affordableResets = L < secondJALevel(classData)
         ? Number.POSITIVE_INFINITY
         : Math.max(0, Math.floor((mp - minMPAtLevel(classData, L)) / classData.mpLossPerReset));
@@ -1671,7 +1815,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       // Target level under cap-wash: final level's inflow → HP. No INT reset for Mages.
       phase = 'MP-Cap HP Wash';
       if (L > currentState.level) {
-        const freshAP = freshAPAtLevel(classData, L);
+        const freshAP = usableFreshAP;
         mp += freshAP * (classData.freshAPMPBase + Math.floor(baseInt / 10));
         peakMPThisLevel = Math.max(peakMPThisLevel, mp);
         hpMPPoolSeeded = freshAP > 0;
@@ -1689,7 +1833,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       // so the target level's OWN fresh AP and paired resets belong here, not just the levels
       // below it.
       const stale = p.staleHPPerLevelPhase3 || 0;
-      const freshAP = L > currentState.level ? freshAPAtLevel(classData, L) : 0;
+      const freshAP = usableFreshAP;
       const affordableResets = L < secondJALevel(classData)
         ? Number.POSITIVE_INFINITY
         : Math.max(0, Math.floor((mp - minMPAtLevel(classData, L)) / classData.mpLossPerReset));
@@ -1805,6 +1949,10 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
     }
 
     if (mpWashesThisLevel > 0 || freshHPWashesThisLevel > 0) hpMPPoolSeeded = true;
+    if (firstJobAPThisLevel > 0) {
+      const jobLabel = `${firstJobRequirement.stat} for 1st Job`;
+      phase = phase ? `${jobLabel} + ${phase}` : jobLabel;
+    }
     const hpMPPoolValid = staleHPWashesThisLevel === 0 || hpMPPoolSeeded;
     cumulativeResets += resetsThisLevel;
 
@@ -1816,6 +1964,11 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       baseInt: Math.round(baseInt),
       // Mages: Main Stat IS INT, so reflect it rather than tracking a separate counter.
       mainStat: Math.round(classData.isMage ? baseInt : mainStat),
+      firstJobStat: firstJobRequirement ? firstJobRequirement.stat : null,
+      firstJobStatValue: firstJobRequirement
+        ? Math.round(firstJobRequirement.stat === 'INT' ? baseInt : firstJobStatValue)
+        : null,
+      firstJobAPThisLevel,
       phase,
       freshHPWashesThisLevel,
       staleHPWashesThisLevel,

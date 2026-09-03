@@ -636,6 +636,7 @@
           <div class="field" style="grid-column: 1 / -1;">
             <label for="i-class">job</label>
             <select id="i-class"></select>
+            <span class="hint" id="i-first-job-hint"></span>
           </div>
         </div>
       </div>
@@ -677,7 +678,7 @@
           </div>
           <div class="field">
             <label for="i-cur-int">int</label>
-            <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+            <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
           </div>
         </div>
       </div>
@@ -1231,11 +1232,16 @@
 
     // Mages never swap (their Main Stat IS INT), so the Swap Level input is hidden for them.
     function syncSwapVisibility() {
-      const isMage = CLASSES[classSelect.value].isMage;
+      const classData = CLASSES[classSelect.value];
+      const isMage = classData.isMage;
       $('f-swap-level').hidden = isMage;
       $('i-swap-level-hint').textContent = isMage
         ? ''
         : 'Playable from here — MP Wash stops and Base INT resets to your Main Stat.';
+      const requirement = classData.firstJobRequirement;
+      $('i-first-job-hint').textContent = requirement
+        ? `First job: lvl ${requirement.level} with at least ${requirement.minimum} ${requirement.stat}. These AP stay permanently allocated.`
+        : 'Beginner has no job-advancement stat requirement.';
     }
 
     classSelect.addEventListener('change', syncSwapVisibility);
