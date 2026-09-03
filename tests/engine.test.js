@@ -1102,6 +1102,21 @@ describe('Exact fresh-AP scheduling', () => {
   });
 });
 
+// ────────────────────────── UI calculation trigger ──────────────────────────
+
+describe('UI calculation trigger', () => {
+  test('Calculation runs only when the form is explicitly submitted', () => {
+    assertTrue(indexSrc.includes('onsubmit="event.preventDefault(); runCalc();"'),
+      'the Calculate form should invoke runCalc on submit');
+    assertEq((indexSrc.match(/\brunCalc\(/g) || []).length, 2,
+      'runCalc should only appear in its declaration and the form submit handler');
+    assertTrue(indexSrc.includes("classSelect.addEventListener('change', syncSwapVisibility);"),
+      'changing class should still update class-specific field visibility');
+    assertTrue(!indexSrc.includes('__calcDebounce'),
+      'input changes should not schedule a debounced calculation');
+  });
+});
+
 // ────────────────────────── Web Worker transport ──────────────────────────
 // Node has no Worker, so these assert the *contract* wash-worker.js relies on rather than driving
 // a real worker. The two things that actually break across the boundary are (a) a payload that

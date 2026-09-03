@@ -622,7 +622,7 @@
       </div>
     </header>
 
-    <form id="calc-form" onsubmit="event.preventDefault(); runCalc(true);">
+    <form id="calc-form" onsubmit="event.preventDefault(); runCalc();">
     <section class="section">
       <div class="section-head">
         <span class="section-num">i.</span>
@@ -1194,11 +1194,10 @@
       });
     }
 
-    function runCalc(force = false) {
+    function runCalc() {
       const input = readInputs();
       if (!input) {
-        // Don't wipe a previous valid result while the user is mid-edit.
-        if (force) showFormError('Fill in every field with a value in its allowed range to calculate.');
+        showFormError('Fill in every field with a value in its allowed range to calculate.');
         return;
       }
       // Cross-field validation
@@ -1239,18 +1238,7 @@
         : 'Playable from here — MP Wash stops and Base INT resets to your Main Stat.';
     }
 
-    classSelect.addEventListener('change', () => { syncSwapVisibility(); runCalc(); });
-    mwSelect.addEventListener('change', () => runCalc());
-    document.querySelectorAll('input[type=number]').forEach(el => {
-      el.addEventListener('input', () => {
-        clearTimeout(window.__calcDebounce);
-        window.__calcDebounce = setTimeout(() => runCalc(), 200);
-      });
-    });
-    // The Calculate button is a form submit (triggered by the <form onsubmit>). Cancel any pending debounce.
-    $('btn-calc').addEventListener('click', () => {
-      clearTimeout(window.__calcDebounce);
-    });
+    classSelect.addEventListener('change', syncSwapVisibility);
 
     $('leveltable-toggle').addEventListener('click', () => {
       $('leveltable').classList.toggle('open');
@@ -1261,7 +1249,6 @@
     });
 
     syncSwapVisibility();
-    runCalc(true);
   </script>
 </body>
 </html>
