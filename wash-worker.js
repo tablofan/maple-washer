@@ -6,8 +6,10 @@
 // harness evals.
 //
 // Message contract (see tests/engine.test.js for the shape assertions):
-//   in:  { className, currentState, goals, gearInt, mwMultiplier }
-//   out: { type: 'progress', completed, total } | { type: 'result', result } | { type: 'error', message }
+//   in:  { requestId, className, currentState, goals, gearInt, mwMultiplier }
+//   out: { requestId, type: 'progress', completed, total }
+//      | { requestId, type: 'result', result }
+//      | { requestId, type: 'error', message }
 //
 // `className` is sent instead of the `classData` object because class entries carry function
 // properties (minMPFormula, minHPFormula) which structured cloning cannot transfer. The worker
@@ -16,7 +18,7 @@
 importScripts('./classes.js', './engine.js');
 
 self.onmessage = (event) => {
-  const { className, currentState, goals, gearInt, mwMultiplier } = event.data;
+  const { requestId, className, currentState, goals, gearInt, mwMultiplier } = event.data;
   try {
     const classData = CLASSES[className];
     if (!classData) {
@@ -33,6 +35,7 @@ self.onmessage = (event) => {
       mwMultiplier,
       (progress) => {
         self.postMessage({
+          requestId,
           type: 'progress',
           completed: progress.completed,
           total: progress.total,
@@ -40,9 +43,10 @@ self.onmessage = (event) => {
       }
     );
 
-    self.postMessage({ type: 'result', result });
+    self.postMessage({ requestId, type: 'result', result });
   } catch (err) {
     self.postMessage({
+      requestId,
       type: 'error',
       message: (err && err.message) ? err.message : String(err),
     });

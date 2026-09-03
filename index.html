@@ -1090,7 +1090,7 @@
     // The optimizer is CPU-bound and can take tens of seconds on a wide search. Running it on the
     // main thread froze the whole page. We hand it to a Web Worker when available and fall back to
     // a synchronous call otherwise — both paths call the same engine function, so results match.
-    const calcWorker = (() => {
+    let calcWorker = (() => {
       try {
         // Relative URL, same origin: deployable to GitHub Pages as a static file.
         return new Worker('./wash-worker.js');
@@ -1131,8 +1131,9 @@
     // Payload sent across the worker boundary. `classData` is deliberately excluded: it holds
     // function properties (minMPFormula/minHPFormula) that cannot be structured-cloned. The worker
     // re-resolves the class from `className` against its own CLASSES table.
-    function calcPayload(input) {
+    function calcPayload(input, requestId) {
       return {
+        requestId,
         className: input.className,
         currentState: input.currentState,
         goals: input.goals,
@@ -1142,9 +1143,12 @@
     }
 
     function runOnWorker(input, token) {
-      calcWorker.onmessage = (event) => {
-        if (token !== runToken) return;  // superseded by a newer run
+      const worker = calcWorker;
+      worker.onmessage = (event) => {
         const msg = event.data;
+        // The handler is replaced for each run, so the closure token alone cannot identify a
+        // queued response from an earlier request. The worker must echo the originating ID.
+        if (msg.requestId !== token || token !== runToken) return;
         if (msg.type === 'progress') {
           setCalcProgress(msg.completed, msg.total);
         } else if (msg.type === 'result') {
@@ -1154,15 +1158,27 @@
           showFormError('Calculation failed: ' + msg.message);
         }
       };
-      calcWorker.onerror = () => {
-        if (token !== runToken) return;
+      worker.onerror = () => {
         // Worker is unusable (script failed to load, etc.) — drop it and compute inline from here on.
+        if (calcWorker === worker) calcWorker = null;
+        worker.terminate();
+        if (token !== runToken) return;
         setCalcRunning(false);
         showFormError('Background calculation unavailable; running on the main thread.');
-        calcWorker.terminate();
         runInline(input, token);
       };
-      calcWorker.postMessage(calcPayload(input));
+      try {
+        worker.postMessage(calcPayload(input, token));
+      } catch {
+        // A synchronously rejected post (for example, a worker that has just died) follows the
+        // same persistent fallback as an asynchronous worker error.
+        if (calcWorker === worker) calcWorker = null;
+        worker.terminate();
+        if (token !== runToken) return;
+        setCalcRunning(false);
+        showFormError('Background calculation unavailable; running on the main thread.');
+        runInline(input, token);
+      }
     }
 
     function runInline(input, token) {

@@ -15,10 +15,13 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const classesSrc = fs.readFileSync(path.join(ROOT, 'classes.js'), 'utf-8');
 const engineSrc = fs.readFileSync(path.join(ROOT, 'engine.js'), 'utf-8');
+const workerSrc = fs.readFileSync(path.join(ROOT, 'wash-worker.js'), 'utf-8');
+const indexSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
 
 // Load via a tmp CommonJS module so V8 JIT-optimises the hot loops the same way it does
 // for normal require()'d code. (Top-level `eval` keeps the eval'd code in interpreted mode
@@ -1105,7 +1108,9 @@ describe('Exact fresh-AP scheduling', () => {
 // cannot be structured-cloned, and (b) progress/result shapes drifting from what index.html reads.
 
 describe('Web Worker transport', () => {
-  const WORKER_PAYLOAD_KEYS = ['className', 'currentState', 'goals', 'gearInt', 'mwMultiplier'];
+  const WORKER_PAYLOAD_KEYS = [
+    'requestId', 'className', 'currentState', 'goals', 'gearInt', 'mwMultiplier',
+  ];
 
   // Anything non-cloneable here would throw at postMessage time, in the browser only.
   function assertCloneable(value, path, seen = new Set()) {
@@ -1127,6 +1132,7 @@ describe('Web Worker transport', () => {
       assertTrue(typeof classData.minMPFormula === 'function',
         `${className}: expected a function formula to guard against`);
       const payload = {
+        requestId: 42,
         className,
         currentState: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
         goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
@@ -1137,6 +1143,58 @@ describe('Web Worker transport', () => {
         JSON.stringify([...WORKER_PAYLOAD_KEYS].sort()), 'payload has exactly the expected keys');
       assertCloneable(payload, `payload(${className})`);
     }
+  });
+
+  test('The worker echoes the request ID on progress, result, and error messages', () => {
+    const messages = [];
+    const context = {
+      importScripts() {},
+      CLASSES: { Hero: {} },
+      optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgress) {
+        onProgress({ completed: 1, total: 2 });
+        return { feasible: true, marker: goals.marker };
+      },
+      self: { postMessage(message) { messages.push(message); } },
+    };
+    vm.runInNewContext(workerSrc, context, { filename: 'wash-worker.js' });
+
+    context.self.onmessage({
+      data: {
+        requestId: 17,
+        className: 'Hero',
+        currentState: {},
+        goals: { marker: 'newest' },
+        gearInt: 0,
+        mwMultiplier: 1,
+      },
+    });
+    assertEq(messages.length, 2, 'progress and result were posted');
+    assertTrue(messages.every(message => message.requestId === 17),
+      'every success-path message echoes its request ID');
+    assertEq(messages[1].result.marker, 'newest', 'result belongs to the identified request');
+
+    context.self.onmessage({
+      data: {
+        requestId: 18,
+        className: 'Missing',
+        currentState: {},
+        goals: {},
+        gearInt: 0,
+        mwMultiplier: 1,
+      },
+    });
+    assertEq(messages.at(-1).type, 'error', 'unknown class uses the error path');
+    assertEq(messages.at(-1).requestId, 18, 'error echoes its request ID');
+  });
+
+  test('The UI filters by echoed request ID and permanently disables a failed worker', () => {
+    assertTrue(/msg\.requestId !== token \|\| token !== runToken/.test(indexSrc),
+      'queued responses are matched to both the request and current run');
+    assertTrue(/let calcWorker =/.test(indexSrc), 'worker reference is mutable');
+    assertTrue(/calcWorker === worker\) calcWorker = null/.test(indexSrc),
+      'worker errors clear the shared worker reference');
+    assertTrue(/try \{\s*worker\.postMessage\(calcPayload\(input, token\)\)/.test(indexSrc),
+      'synchronous postMessage failures are caught');
   });
 
   test('optimize reports progress over a bounded, monotone outer loop', () => {
