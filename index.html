@@ -709,15 +709,24 @@
       right: 28px;
       top: 24px;
     }
-    .wizard-card form { min-height: 430px; display: flex; flex-direction: column; }
+    .wizard-card form { min-height: 490px; display: flex; flex-direction: column; }
     .wizard-stage { animation: stage-in 300ms cubic-bezier(.2,.8,.2,1); display: none; }
     .wizard-stage.active { display: block; }
     @keyframes stage-in {
       from { opacity: 0; transform: translateX(10px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    .stage-body { margin-top: 4px; }
-    .form-columns { display: grid; grid-template-columns: 1fr 1.05fr; gap: 58px; }
+    .stage-heading {
+      color: var(--text);
+      font-family: 'Fraunces', serif;
+      font-size: clamp(28px, 2.6vw, 36px);
+      font-variation-settings: 'opsz' 90, 'SOFT' 70;
+      font-weight: 450;
+      letter-spacing: -.03em;
+      line-height: 1.1;
+      margin: 0;
+    }
+    .stage-body { margin-top: 26px; }
     .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 44px; }
     .field-stack { align-content: start; display: grid; gap: 22px; }
 
@@ -771,11 +780,61 @@
       font-size: 20px;
       padding-right: 42px;
     }
-    .wizard-card .field select option { background: #fffefa; color: var(--text); }
+    .wizard-card .field select option {
+      background: #fffefa;
+      color: var(--text);
+      font-family: 'Fraunces', serif;
+      font-size: 17px;
+      padding: 10px 14px;
+    }
+
+    /* Chrome 135+ hands over the option list itself; everywhere else the rule above is as far
+       as the native popup can be pushed, and the closed control still matches on its own. */
+    @supports (appearance: base-select) {
+      .wizard-card .field select,
+      .wizard-card .field select::picker(select) { appearance: base-select; }
+      .wizard-card .field select {
+        align-items: center;
+        background-image: none;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding-right: 16px;
+      }
+      .wizard-card .field select::picker-icon {
+        color: var(--text-2);
+        font-size: 11px;
+        opacity: .6;
+        transition: rotate 160ms ease;
+      }
+      .wizard-card .field select:open::picker-icon { rotate: 180deg; }
+      .wizard-card .field select::picker(select) {
+        background: #fffefa;
+        border: 1px solid #bbae9c;
+        border-radius: 10px;
+        box-shadow: 0 18px 40px rgba(46, 38, 28, .18);
+        margin-top: 6px;
+        opacity: 0;
+        overflow: hidden;
+        padding: 6px;
+        transition: opacity 140ms ease, display 140ms allow-discrete;
+      }
+      .wizard-card .field select:open::picker(select) { opacity: 1; }
+      @starting-style { .wizard-card .field select:open::picker(select) { opacity: 0; } }
+      .wizard-card .field option {
+        border-radius: 7px;
+        font-family: 'Fraunces', serif;
+        font-size: 18px;
+        padding: 9px 12px;
+      }
+      .wizard-card .field option::checkmark { display: none; }
+      .wizard-card .field option:hover,
+      .wizard-card .field option:focus { background: var(--maple-glow); color: var(--text); }
+      .wizard-card .field option:checked { background: var(--maple); color: #fffefa; }
+    }
 
     .card-field { gap: 10px; }
     .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
-    .simple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 
     .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 44px; }
     .review-group { border-top: 1px solid var(--line); padding-top: 16px; }
@@ -857,7 +916,6 @@
     @media (max-width: 980px) {
       .frame { padding-inline: 30px; }
       .wizard-layout { grid-template-columns: 205px minmax(0, 1fr); gap: 24px; }
-      .form-columns { gap: 30px; }
       .step-button { gap: 12px; }
       .step-name { font-size: 19px; }
       .result.section { margin-left: 229px; }
@@ -882,8 +940,9 @@
       .wizard-card { border-radius: 12px; min-height: 0; padding: 34px 18px 24px; }
       .wizard-card::after { font-size: 24px; right: 14px; top: 12px; }
       .wizard-card form { min-height: 0; }
-      .stage-body { margin-top: 4px; }
-      .form-columns, .simple-grid, .review-grid { grid-template-columns: 1fr; gap: 30px; }
+      .stage-heading { font-size: 26px; }
+      .stage-body { margin-top: 18px; }
+      .review-grid { grid-template-columns: 1fr; gap: 30px; }
       .pair-grid { gap: 14px 12px; }
       .field-stack { gap: 14px; }
       .wizard-card .field input, .wizard-card .field select { font-size: 17px; min-height: 52px; padding: 10px 12px; }
@@ -948,6 +1007,7 @@
       <section class="wizard-card" aria-label="Wash plan builder">
         <form id="calc-form" novalidate>
           <div class="wizard-stage active" data-stage="0">
+            <h2 class="stage-heading">Character</h2>
             <div class="stage-body pair-grid">
               <div class="field-stack">
                 <div class="field card-field">
@@ -991,54 +1051,45 @@
           </div>
 
           <div class="wizard-stage" data-stage="1" hidden>
-            <div class="stage-body form-columns">
-              <div class="form-group">
-                <div class="simple-grid">
-                  <div class="field card-field">
-                    <label for="i-target-level">Target level</label>
-                    <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
-                  </div>
-                  <div class="field card-field" id="f-swap-level">
-                    <label for="i-swap-level">Swap level</label>
-                    <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
-                  </div>
-                </div>
+            <h2 class="stage-heading">Goals</h2>
+            <div class="stage-body pair-grid">
+              <div class="field card-field">
+                <label for="i-target-level">Target level</label>
+                <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
               </div>
-              <div class="form-group">
-                <div class="simple-grid">
-                  <div class="field card-field">
-                    <label for="i-hp-goal">HP goal</label>
-                    <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" required>
-                    <span class="clamp-note" id="i-hp-goal-clamp-note"></span>
-                  </div>
-                  <div class="field card-field">
-                    <label for="i-mp-goal">MP goal</label>
-                    <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" required>
-                    <span class="clamp-note" id="i-mp-goal-clamp-note"></span>
-                  </div>
-                </div>
+              <div class="field card-field" id="f-swap-level">
+                <label for="i-swap-level">Swap level</label>
+                <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
+              </div>
+              <div class="field card-field">
+                <label for="i-hp-goal">HP goal</label>
+                <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" required>
+                <span class="clamp-note" id="i-hp-goal-clamp-note"></span>
+              </div>
+              <div class="field card-field">
+                <label for="i-mp-goal">MP goal</label>
+                <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" required>
+                <span class="clamp-note" id="i-mp-goal-clamp-note"></span>
               </div>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="2" hidden>
-            <div class="stage-body form-columns">
-              <div class="form-group">
-                <div class="field card-field">
-                  <label for="i-gear-int">Gear INT</label>
-                  <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
-                </div>
+            <h2 class="stage-heading">Gear &amp; buffs</h2>
+            <div class="stage-body pair-grid">
+              <div class="field card-field">
+                <label for="i-gear-int">INT Gear</label>
+                <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
               </div>
-              <div class="form-group">
-                <div class="field card-field">
-                  <label for="i-mw">Maple Warrior</label>
-                  <select id="i-mw"></select>
-                </div>
+              <div class="field card-field">
+                <label for="i-mw">Maple Warrior</label>
+                <select id="i-mw"></select>
               </div>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="3" hidden>
+            <h2 class="stage-heading">Review</h2>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
                 <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
@@ -1059,7 +1110,7 @@
               <section class="review-group">
                 <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="2">Edit</button></div>
                 <div class="review-list">
-                  <div class="review-row"><span class="review-label">Gear INT</span><span class="review-value" data-review="gear"></span></div>
+                  <div class="review-row"><span class="review-label">INT Gear</span><span class="review-value" data-review="gear"></span></div>
                   <div class="review-row"><span class="review-label">Maple Warrior</span><span class="review-value" data-review="mw"></span></div>
                 </div>
               </section>

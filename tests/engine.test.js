@@ -298,7 +298,7 @@ describe('Engine invariants', () => {
       'mpWashEnd ≤ mpWashStop');
     assertTrue(r.params.mpWashStop <= 180, 'mpWashStop ≤ targetLevel');
   });
-  test('Feasible plan with zero Gear INT', () => {
+  test('Feasible plan with zero INT Gear', () => {
     const r = plan({
       class: 'Assassin',
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },

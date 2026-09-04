@@ -200,14 +200,14 @@ function prepareInputs(classData, currentState, goals, className) {
 // all consumers (evaluateStrategy, levelTable) should call these instead of inlining the math.
 
 // MP gained per single MP-Wash cycle (Krythan/Nise): freshAPMPBase + floor(Base INT / 10) - mpLossPerReset.
-// Uses Base INT only — Gear INT and Maple Warrior do NOT amplify this per-cycle yield (per Nise).
+// Uses Base INT only — INT Gear and Maple Warrior do NOT amplify this per-cycle yield (per Nise).
 function washCycleMP(classData, baseInt) {
   const deficit = classData.mpLossPerReset - classData.freshAPMPBase;
   return Math.floor(baseInt / 10) - deficit;
 }
 
-// Per-level MP gained from INT after a level-up: floor((Base INT * MW + Gear INT) / 10).
-// Gear INT contributes only if level ≥ GEAR_WORN_FROM_LEVEL. Class-independent (no classData).
+// Per-level MP gained from INT after a level-up: floor((Base INT * MW + INT Gear) / 10).
+// INT Gear contributes only if level ≥ GEAR_WORN_FROM_LEVEL. Class-independent (no classData).
 function intMPPerLevel(baseInt, gearInt, mwMultiplier, level) {
   const gearActive = level >= GEAR_WORN_FROM_LEVEL ? gearInt : 0;
   return Math.floor((baseInt * mwMultiplier + gearActive) / 10);
@@ -241,7 +241,7 @@ function sumIntTenths(start, count) {
 
 // Sum of INT-driven MP contributions over levels (fromLevel, toLevel] (level-ups at L = fromLevel+1 … toLevel).
 // Per Nise: MP Gained LvlUP includes Total INT/10. Per Krythan: MW multiplies the Base-INT portion only.
-// Per spec: Gear INT is worn from level GEAR_WORN_FROM_LEVEL onward (lvl 10 by default).
+// Per spec: INT Gear is worn from level GEAR_WORN_FROM_LEVEL onward (lvl 10 by default).
 // Per level L: gain = floor((Base_INT_at_L * MW + Gear_INT_at_L) / 10), via intMPPerLevel().
 //
 // For plateau ranges (startInt === endInt) the sum is computed as `levels * intMPPerLevel(...)`.

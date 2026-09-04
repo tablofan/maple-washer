@@ -39,12 +39,12 @@ _Avoid_: AP spend, stat point
 INT from **AP Allocation** and AP-Reset gains. Excludes equipment. Used in `INT/10` MP gain bonuses.
 _Avoid_: pure INT, character INT
 
-**Gear INT**:
+**INT Gear**:
 INT from equipment. Added to **Base INT** to get **Total INT** (the value used in MP-gain formulas). User enters this as a flat number; assumed worn from level 10 until **Level to Remove INT Gear**.
-_Avoid_: INT gear, equip INT
+_Avoid_: Gear INT, equip INT
 
 **Total INT**:
-**Base INT** + **Gear INT**. The value plugged into per-level MP-gain formulas.
+**Base INT** + **INT Gear**. The value plugged into per-level MP-gain formulas.
 
 **Main Stat**:
 The combat stat each class scales damage from — STR (Warrior), DEX (Bowman/Pirate-Gunslinger), LUK (Thief), STR (Pirate-Brawler), and **INT itself** (Magician). For Magicians, INT serves as both the washing currency *and* the **Main Stat**, which is why their wash is much simpler.
@@ -107,7 +107,7 @@ The pre-game Shift to INT can draw from any eligible non-INT stats (STR/DEX/LUK)
 The calculator's job is to find the **Phase Plan** that minimises total **AP Resets** subject to: `final HP ≥ HP Goal`, `final MP ≥ MP Goal`, `MP ≥ Minimum MP` at every level along the way.
 
 **Locked to Target Level (not optimization variables):**
-- Level to remove **Gear INT** = **Target Level** (wearing it longer only helps; removing it earlier costs MP gain).
+- Level to remove **INT Gear** = **Target Level** (wearing it longer only helps; removing it earlier costs MP gain).
 
 **Locked to Swap Level (not optimization variables):**
 - Level to reset **Base INT** → **Main Stat** = **Swap Level** (superseded — see ADR 0001; it was previously locked to **Target Level** on the mistaken rationale that there was no benefit to resetting early).
@@ -143,7 +143,7 @@ Krythan's per-class washing sheets — one per class, same author, same Nise-for
 
 Their inputs include both "Level to Stop MP Washing" (the strategic switch) and "Level to Project To" (the level at which targets are evaluated). MapleWasher separates the underlying decisions: **Swap Level** remains the user's playability choice, while the optimizer may stop **MP Wash** earlier and spend the intervening levels on **Pre-Swap Fresh HP Wash**. This preserves one user-facing decision without forcing MP Washing to continue when Fresh HP Washing is cheaper.
 
-Differences from MapleWasher's scope: Krythan's sheets include HP Challenges columns (skipped here), Spring of Youth quest HP and equip HP constants (skipped here), and individual INT-gear-piece tracking (replaced here with a single Gear INT input).
+Differences from MapleWasher's scope: Krythan's sheets include HP Challenges columns (skipped here), Spring of Youth quest HP and equip HP constants (skipped here), and individual INT-gear-piece tracking (replaced here with a single INT Gear input).
 
 ## Relationships
 
