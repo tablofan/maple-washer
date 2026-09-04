@@ -1101,6 +1101,7 @@
                   <div class="review-row"><span class="review-label">Class</span><span class="review-value" data-review="class"></span></div>
                   <div class="review-row"><span class="review-label">Level · HP · MP</span><span class="review-value" data-review="current"></span></div>
                   <div class="review-row"><span class="review-label">STR · DEX · LUK · INT</span><span class="review-value" data-review="stats"></span></div>
+                  <div class="review-row"><span class="review-label">Non-INT pool</span><span class="review-value" data-review="pool"></span></div>
                 </div>
               </section>
               <section class="review-group">
@@ -1187,7 +1188,7 @@
                 <th>hp</th>
                 <th>mp</th>
                 <th>base int</th>
-                <th id="lt-mainstat-head">main stat</th>
+                <th>non-int pool</th>
                 <th class="phase-col">phase</th>
                 <th>resets / lvl</th>
                 <th>cumul. resets</th>
@@ -1428,6 +1429,13 @@
       put('class', classSelect.value);
       put('current', `${$('i-cur-level').value} · ${$('i-cur-hp').value}\u00a0HP · ${$('i-cur-mp').value}\u00a0MP`);
       put('stats', `${$('i-cur-str').value} · ${$('i-cur-dex').value} · ${$('i-cur-luk').value} · ${$('i-cur-int').value}`);
+      // Only the AP above the class floors can ever become INT, so the review shows the pool the
+      // plan actually has to spend rather than leaving it to be worked out from the three stats.
+      put('pool', nonIntPool(CLASSES[classSelect.value], {
+        str: Number($('i-cur-str').value),
+        dex: Number($('i-cur-dex').value),
+        luk: Number($('i-cur-luk').value),
+      }));
       put('target-level', $('i-target-level').value);
       put('goals', `${$('i-hp-goal').value}\u00a0HP · ${$('i-mp-goal').value}\u00a0MP`);
       put('swap', $('i-swap-level').value);
@@ -1609,8 +1617,8 @@
     }
 
     const opLabels = {
-      // Shift source is any non-INT stat (player picks); literal — STAT substitution doesn't apply.
-      shift_up:   { op: '-STR/DEX/LUK +INT', label: 'Mid-progress shift to INT (drawn from your non-INT stats)' },
+      // Shift source is the non-INT pool (player picks the stat); literal — no STAT substitution.
+      shift_up:   { op: '-Non-INT +INT', label: 'Mid-progress shift to INT (drawn from your non-INT pool)' },
       mpWash:     { op: '-MP +INT/STAT', label: 'MP Wash cycles' },
       phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash' },
       intReset:   { op: '-INT +STAT', label: 'Reset Base INT' },
@@ -1746,8 +1754,6 @@
 
       const rows = levelTable(input.classData, input.currentState, input.goals, input.gearInt, input.mwMultiplier, result);
       $('leveltable-count').textContent = `(${rows.length} levels)`;
-      // The Main Stat column header names the class's actual stat (LUK, STR, DEX…).
-      $('lt-mainstat-head').textContent = input.classData.mainStat.toLowerCase();
       const phaseChangedSet = new Set();
       let prevPhase = null;
       rows.forEach(r => {
@@ -1761,7 +1767,7 @@
           <td>${fmt(r.hp)}</td>
           <td>${fmt(r.mp)}</td>
           <td>${fmt(r.baseInt)}</td>
-          <td>${fmt(r.mainStat)}</td>
+          <td>${fmt(r.nonIntPool)}</td>
           <td class="phase-col">${r.phase}</td>
           <td>${r.resetsThisLevel || ''}</td>
           <td>${fmt(r.cumulativeResets)}</td>

@@ -36,6 +36,21 @@ function baseStatValue(currentState, stat) {
     : (currentState[stat.toLowerCase()] ?? STARTING_MAIN_STAT);
 }
 
+// Permanent floor for a non-INT stat: everyone starts at 4, and the first-job stat can never be
+// reset back below its advancement minimum once the job has been taken.
+function nonIntStatFloor(classData, stat) {
+  const requirement = classData.firstJobRequirement;
+  return requirement && requirement.stat === stat ? requirement.minimum : STARTING_MAIN_STAT;
+}
+
+// Non-INT pool = the STR/DEX/LUK AP still free to move into INT. Points sitting at the floors are
+// stuck there for good. Which of the three stats a movable point came from never matters to the
+// plan, so downstream the three collapse into this one number.
+function nonIntPool(classData, currentState) {
+  return ['STR', 'DEX', 'LUK'].reduce((pool, stat) =>
+    pool + Math.max(0, baseStatValue(currentState, stat) - nonIntStatFloor(classData, stat)), 0);
+}
+
 // AP which must remain in the first-job stat is not available for INT-building or washing.
 // Schedule it as early as possible, matching the fresh-character route in Krythan's guides:
 // meet the advancement requirement first, then put the remaining AP into INT.
@@ -527,7 +542,7 @@ function runCleanup(classData, hpEndPhase3, mpEndPhase3Raw, goals, targetBaseInt
 }
 
 // The strategy:
-//   (Pre-game) Optional `shift`: AP-Reset `-<non-INT> +INT` (source is any of the user's non-INT stats).
+//   (Pre-game) Optional `shift`: AP-Reset `-<Non-INT> +INT` (drawn from the non-INT pool; the player picks the stat).
 //   Phase 1 (currentLevel → mpWashStart): Fresh AP → INT until Target Base INT, then → Main Stat.
 //   Phase 2 (mpWashStart → mpWashEnd): MP Wash. Fresh AP → MP, then -MP +INT until targetBaseInt, then -MP +MainStat.
 //   Pre-swap (mpWashEnd → mpWashStop): Fresh AP → HP, paired with -MP +MainStat, while retaining Base INT.
@@ -1025,19 +1040,8 @@ function optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgr
     }
   }
   const remainingLevels = goals.targetLevel - currentState.level;
-  // Positive-shift budget = non-INT AP above the permanent class floors. The required first-job
-  // stat cannot be reset below its advancement minimum after the job has been taken.
-  const str = currentState.str ?? STARTING_MAIN_STAT;
-  const dex = currentState.dex ?? STARTING_MAIN_STAT;
-  const luk = currentState.luk ?? STARTING_MAIN_STAT;
-  const statFloor = stat => firstJobRequirement && firstJobRequirement.stat === stat
-    ? firstJobRequirement.minimum
-    : STARTING_MAIN_STAT;
-  const maxPositiveShift = Math.max(0,
-    Math.max(0, str - statFloor('STR'))
-      + Math.max(0, dex - statFloor('DEX'))
-      + Math.max(0, luk - statFloor('LUK'))
-  );
+  // Positive-shift budget = the non-INT pool. Nothing below the floors can ever reach INT.
+  const maxPositiveShift = nonIntPool(classData, currentState);
   // Precompute range sums (these depend only on class + currentLevel + targetLevel, not strategy).
   const ranges = precomputeRanges(classData, currentState.level, goals.targetLevel);
 
@@ -1510,7 +1514,7 @@ function phasePlan(classData, currentState, goals, result) {
   if (b.shift > 0 && b.shiftDir === 'up') {
     phases.push({
       range: `Before levelling`,
-      action: `AP Reset ${b.shift} times: -<STR/DEX/LUK> +INT (draw only from points above the permanent first-job stat floor).`,
+      action: `AP Reset ${b.shift} times: -Non-INT +INT (spend the non-INT pool; points at the floors cannot move).`,
       phase: 'Shift to INT',
     });
   }
@@ -1692,6 +1696,15 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
   let firstJobStatValue = firstJobRequirement
     ? baseStatValue(currentState, firstJobRequirement.stat)
     : null;
+  // The non-INT pool the plan starts from, after the pre-game shift has spent part of it. The
+  // shift is charged to the pool rather than to a column because the player chooses which stat to
+  // drain. From there the pool only grows: every AP the plan puts into Main Stat above its floor
+  // is movable again, including the Base INT dumped there at the Swap Level. Mages are the
+  // exception — their Main Stat IS INT, so their pool just sits at whatever STR/DEX/LUK allow.
+  const signedShift = result.breakdown.shiftDir === 'down' ? -result.breakdown.shift : result.breakdown.shift;
+  const basePool = Math.max(0, nonIntPool(classData, currentState) - signedShift);
+  const mainStatFloor = nonIntStatFloor(classData, classData.mainStat);
+  const mainStatMovableAtStart = Math.max(0, mainStat - mainStatFloor);
   let cumulativeResets = result.breakdown.shift;  // pre-game shift counted at level 0
   let phase2MPRemaining = p.phase2MPWashResets ?? result.breakdown.mpWash;
   let preSwapFreshRemaining = p.preSwapFreshHPResets || 0;
@@ -2082,6 +2095,9 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       baseInt: Math.round(baseInt),
       // Mages: Main Stat IS INT, so reflect it rather than tracking a separate counter.
       mainStat: Math.round(classData.isMage ? baseInt : mainStat),
+      nonIntPool: Math.round(classData.isMage
+        ? basePool
+        : basePool + Math.max(0, mainStat - mainStatFloor) - mainStatMovableAtStart),
       firstJobStat: firstJobRequirement ? firstJobRequirement.stat : null,
       firstJobStatValue: firstJobRequirement
         ? Math.round(firstJobRequirement.stat === 'INT' ? baseInt : firstJobStatValue)

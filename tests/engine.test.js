@@ -40,11 +40,13 @@ const exportList = [
   'naturalMPGainAtLevel',
   'freshAPAtLevel', 'freshAPInRange', 'firstJobAPNeeded',
   'firstJobRequirementAPAtLevel', 'usableFreshAPAtLevel', 'usableFreshAPInRange',
+  'nonIntPool', 'nonIntStatFloor',
 ];
 fs.writeFileSync(tmpModule, classesSrc + '\n' + engineSrc + '\n' + `module.exports = { ${exportList.join(', ')} };`);
 process.on('exit', () => { try { fs.unlinkSync(tmpModule); } catch {} });
 const mod = require(tmpModule);
 const { CLASSES, CLASS_ORDER, optimize, phasePlan, levelTable, prepareInputs } = mod;
+const { nonIntPool, nonIntStatFloor } = mod;
 globalThis.mod = mod;
 
 // ────────────────────────── tiny harness ──────────────────────────
@@ -979,6 +981,97 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 });
 
 // ────────────────────────── 4-stat shift budget ──────────────────────────
+
+describe('Non-INT pool', () => {
+  // Same mid-progress Assassin the Swap Level block uses: LUK is the only stat with surplus.
+  const POOL_START = { level: 40, hp: 1500, mp: 800, str: 4, dex: 4, luk: 45, baseInt: 180 };
+
+  test('The pool counts only AP above each stat floor', () => {
+    // Ren's worked example: an Assassin at 10 STR / 30 DEX / 10 LUK. STR and LUK sit on the
+    // universal floor of 4 (6 movable each); DEX is pinned at 25 by the Thief advancement, so
+    // only 5 of its 30 can move. 6 + 5 + 6 = 17.
+    assertEq(nonIntPool(CLASSES['Assassin'], { str: 10, dex: 30, luk: 10 }), 17);
+    // Warriors pin STR at 35 instead, so the same three numbers give a different pool.
+    assertEq(nonIntPool(CLASSES['Fighter'], { str: 10, dex: 30, luk: 10 }), 32);
+    assertEq(nonIntStatFloor(CLASSES['Assassin'], 'DEX'), 25, 'Thief DEX floor');
+    assertEq(nonIntStatFloor(CLASSES['Assassin'], 'LUK'), 4, 'unrestricted stats floor at 4');
+    assertEq(nonIntStatFloor(CLASSES['Fighter'], 'STR'), 35, 'Warrior STR floor');
+  });
+
+  test('A stat below its floor never contributes (and never goes negative)', () => {
+    assertEq(nonIntPool(CLASSES['Fighter'], { str: 4, dex: 4, luk: 4 }), 0);
+    assertEq(nonIntPool(CLASSES['Magician'], { str: 4, dex: 4, luk: 4 }), 0);
+  });
+
+  test('The pool is the optimizer\'s shift budget', () => {
+    const state = { level: 100, hp: 4000, mp: 1500, str: 4, dex: 400, luk: 4, baseInt: 4 };
+    const r = plan({ class: 'Assassin', current: state,
+      goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    assertFeasible(r);
+    assertTrue(r.breakdown.shift <= nonIntPool(CLASSES['Assassin'], state),
+      `shift ${r.breakdown.shift} cannot exceed the pool`);
+  });
+
+  test('Level table carries a Non-INT pool column', () => {
+    const r = plan({
+      class: 'Assassin',
+      current: POOL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
+    assertTrue('nonIntPool' in rows[0], 'rows carry a nonIntPool field');
+    assertTrue(rows.every(x => Number.isFinite(x.nonIntPool) && x.nonIntPool >= 0),
+      'the pool is always a non-negative number');
+    // The plan only ever adds AP to Main Stat, and Main Stat above its floor is movable, so the
+    // pool never shrinks once levelling starts.
+    assertTrue(rows.every((x, i) => i === 0 || x.nonIntPool >= rows[i - 1].nonIntPool),
+      'the pool never shrinks over the plan');
+  });
+
+  test('The pre-game shift is charged to the pool, not to a stat column', () => {
+    // Enough surplus DEX that the optimizer shifts before levelling. Main Stat (LUK) is untouched
+    // by that shift, so only the pool records what it cost.
+    const state = { level: 100, hp: 6000, mp: 3000, str: 60, dex: 120, luk: 400, baseInt: 13 };
+    const goals = { hpGoal: 16000, mpGoal: 8000, targetLevel: 135, swapLevel: 135 };
+    const r = plan({ class: 'Assassin', current: state, goals });
+    assertFeasible(r);
+    assertTrue(r.breakdown.shift > 0, 'this fixture should need a pre-game shift');
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
+    assertEq(rows[0].nonIntPool,
+      nonIntPool(CLASSES['Assassin'], r.__state) - r.breakdown.shift,
+      'the first row shows the pool left after the shift');
+    assertEq(rows[0].mainStat, state.luk, 'Main Stat is unchanged by the shift');
+  });
+
+  test('Mage pools hold steady — their Main Stat is INT, which is not in the pool', () => {
+    const r = plan({
+      class: 'Magician',
+      current: { level: 10, hp: 400, mp: 900, str: 4, dex: 15, luk: 8, baseInt: 40 },
+      goals: { hpGoal: 3000, mpGoal: 6000, targetLevel: 120, swapLevel: 120 },
+    });
+    assertFeasible(r);
+    const rows = levelTable(CLASSES['Magician'], r.__state, r.__goals, 40, 1.0, r);
+    const expected = nonIntPool(CLASSES['Magician'], r.__state) - r.breakdown.shift;
+    assertTrue(rows.every(x => x.nonIntPool === expected),
+      'every Mage row shows the same pool');
+  });
+
+  test('The UI shows the pool in the level table and on the review step', () => {
+    assertTrue(indexSrc.includes('<th>non-int pool</th>'),
+      'the level table heads the column "non-int pool"');
+    assertTrue(indexSrc.includes('<td>${fmt(r.nonIntPool)}</td>'),
+      'the level table renders row.nonIntPool');
+    assertTrue(!indexSrc.includes('lt-mainstat-head'),
+      'the per-class Main Stat header is gone');
+    assertTrue(indexSrc.includes('data-review="stats"') && indexSrc.includes('data-review="pool"'),
+      'review keeps the raw stats and adds the pool alongside them');
+    assertTrue(indexSrc.includes("put('pool', nonIntPool(CLASSES[classSelect.value]"),
+      'the review pool is computed with the engine helper');
+    assertTrue(indexSrc.includes("op: '-Non-INT +INT'"),
+      'the breakdown names the pool as the shift source');
+  });
+});
 
 describe('4-stat shift budget', () => {
   test('Mage with extra LUK can shift LUK into INT pre-game', () => {
