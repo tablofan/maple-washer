@@ -27,9 +27,13 @@ from the interface and exercised directly through a Node.js test suite.
 | `classes.js` | Class constants, limits, and formula inputs |
 | `engine.js` | Optimization, feasibility checks, phase planning, and level projection |
 | `wash-worker.js` | Web Worker wrapper that runs `optimize` off the main thread |
-| `index.html` | Browser interface and result presentation |
+| `index.html` | Browser interface and result presentation — a four-step wizard (character, goals, gear and buffs, review) built on a custom ARIA listbox rather than native `<select>` |
 | `tests/engine.test.js` | Dependency-free Node.js test harness |
+| `tests/README.md` | How to run the suite and where its reference numbers come from |
 | `CONTEXT.md` | Domain model, terminology, constraints, and reference notes |
+| `docs/adr/` | Architecture decision records for the calculation model |
+| `.github/workflows/tests.yml` | CI: runs the engine suite on push and pull request |
+| `LICENSE` | MIT |
 
 ## Run locally
 
@@ -56,6 +60,10 @@ node tests/engine.test.js
 The suite covers published reference cases, optimizer ordering, mid-progress strategies, engine
 invariants, class limits, phase-plan structure, and agreement between summary and level-by-level
 outputs. It has no package-install step or external test dependencies.
+
+It is slow by design: a handful of tests run full level-1-to-200 searches, so expect several
+minutes rather than seconds. Plans are memoised across tests that assert different facets of the
+same fixture.
 
 ## Model and references
 
