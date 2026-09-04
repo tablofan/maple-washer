@@ -82,21 +82,8 @@
       color: var(--text);
     }
     .wordmark .em-w {
-      font-style: italic;
       font-weight: 300;
       color: var(--maple);
-    }
-
-    .tagline {
-      font-family: 'Fraunces', serif;
-      font-style: italic;
-      font-weight: 400;
-      font-size: 15.5px;
-      color: var(--text-2);
-      padding-left: 14px;
-      border-left: 1px solid var(--line);
-      margin-left: 6px;
-      padding-block: 4px 6px;
     }
 
     .meta-line {
@@ -234,17 +221,6 @@
     .clamp-note:empty { display: none; }
     .clamp-note .arr { font-style: normal; margin-right: 4px; opacity: 0.7; }
 
-    .hint {
-      font-family: 'Inter Tight', sans-serif;
-      font-size: 11.5px;
-      font-weight: 400;
-      color: var(--text-2);
-      margin-top: 4px;
-      line-height: 1.35;
-      display: block;
-    }
-    .hint:empty { display: none; }
-
     .calc-row {
       display: flex;
       align-items: center;
@@ -278,13 +254,6 @@
       transition: transform 0.18s ease;
     }
     .btn-calc:hover .arr { transform: translateX(4px); }
-    .calc-hint {
-      font-family: 'Inter Tight', sans-serif;
-      font-weight: 400;
-      font-size: 13.5px;
-      color: var(--text-mute);
-    }
-
     /* Calculation runs off the main thread in a Web Worker. This only communicates that a run is
        in flight and how far along it is; the page stays interactive throughout. */
     .calc-progress {
@@ -644,14 +613,6 @@
     .mark { width: 38px; height: 38px; transform: none; }
     .mark path { fill: none; stroke: var(--maple); stroke-width: 1.35; }
     .wordmark { color: var(--text); font-size: clamp(38px, 4vw, 52px); }
-    .tagline {
-      border-left: 0;
-      color: var(--text-2);
-      font-style: normal;
-      font-size: 17px;
-      margin-left: 6px;
-      padding: 10px 0 0;
-    }
     .meta-line {
       color: var(--text-2);
       font-family: 'Fraunces', serif;
@@ -734,7 +695,7 @@
       border: 1px solid #bcae99;
       border-radius: 16px;
       box-shadow: var(--shadow);
-      min-height: 660px;
+      min-height: 0;
       overflow: hidden;
       padding: clamp(34px, 5vw, 62px);
       position: relative;
@@ -748,48 +709,15 @@
       right: 28px;
       top: 24px;
     }
-    .wizard-card form { min-height: 535px; display: flex; flex-direction: column; }
+    .wizard-card form { min-height: 380px; display: flex; flex-direction: column; }
     .wizard-stage { animation: stage-in 300ms cubic-bezier(.2,.8,.2,1); display: none; }
     .wizard-stage.active { display: block; }
     @keyframes stage-in {
       from { opacity: 0; transform: translateX(10px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    .stage-kicker {
-      color: var(--maple);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .16em;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-    }
-    .stage-heading {
-      color: var(--text);
-      font-family: 'Fraunces', serif;
-      font-size: clamp(36px, 4vw, 54px);
-      font-variation-settings: 'opsz' 90, 'SOFT' 70;
-      font-weight: 450;
-      letter-spacing: -.035em;
-      line-height: 1.08;
-      max-width: 760px;
-    }
-    .stage-subtitle { color: var(--text-2); font-size: 17px; margin-top: 14px; max-width: 650px; }
-    .stage-body { margin-top: 44px; }
+    .stage-body { margin-top: 4px; }
     .form-columns { display: grid; grid-template-columns: 1fr 1.05fr; gap: 58px; }
-    .form-group-title {
-      align-items: center;
-      color: var(--moss);
-      display: flex;
-      font-family: 'Fraunces', serif;
-      font-size: 24px;
-      font-weight: 480;
-      gap: 16px;
-      margin-bottom: 24px;
-      white-space: nowrap;
-    }
-    .form-group-title::after { background: var(--line); content: ''; height: 1px; width: 100%; }
-    .group-note { color: var(--text-mute); font-size: 13px; margin: -13px 0 20px; }
 
     .wizard-card .field { border: 0; display: flex; padding: 0; }
     .wizard-card .field[hidden] { display: none !important; }
@@ -845,8 +773,6 @@
 
     .select-field { gap: 10px; max-width: 560px; }
     .select-field label { font-size: 13px !important; font-weight: 600 !important; letter-spacing: .12em !important; text-transform: uppercase !important; }
-    .select-field .hint { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
-    .resource-fields { border-top: 1px solid var(--line-soft); }
     .row-field {
       align-items: center;
       border-bottom: 1px solid var(--line-soft) !important;
@@ -868,7 +794,7 @@
     .stat-field label { text-align: center; }
     .stat-field input { min-height: 54px !important; }
     .card-field { gap: 10px; }
-    .card-field .hint, .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
+    .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
     .simple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 
     .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 44px; }
@@ -930,7 +856,6 @@
     .btn-next:hover, .btn-calc:hover { background: linear-gradient(135deg, #ddb35d, #c88c31); box-shadow: 0 11px 24px rgba(147, 95, 22, .23); transform: translateY(-1px); }
     .btn-calc[hidden], .btn-next[hidden] { display: none; }
     .btn-calc[disabled] { cursor: progress; opacity: .6; }
-    .calc-hint { color: var(--text-mute); display: block; font-size: 12px; margin-top: 12px; text-align: right; }
     .calc-progress { color: var(--text-mute); justify-content: flex-end; margin-top: 12px; }
     .calc-progress-track { background: var(--line-soft); }
 
@@ -964,7 +889,6 @@
       .head { align-items: flex-start; gap: 9px; }
       .mark { height: 28px; margin-top: 5px; width: 28px; }
       .wordmark { font-size: 31px; }
-      .tagline { display: none; }
       .meta-line { font-size: 14px; margin-left: 38px; }
       .wizard-layout { grid-template-columns: 48px minmax(0, 1fr); gap: 9px; }
       .wizard-progress { padding-top: 18px; }
@@ -978,12 +902,8 @@
       .wizard-card { border-radius: 12px; min-height: 0; padding: 34px 18px 24px; }
       .wizard-card::after { font-size: 24px; right: 14px; top: 12px; }
       .wizard-card form { min-height: 0; }
-      .stage-kicker { font-size: 9px; }
-      .stage-heading { font-size: 31px; padding-right: 6px; }
-      .stage-subtitle { font-size: 15px; }
-      .stage-body { margin-top: 30px; }
+      .stage-body { margin-top: 4px; }
       .form-columns, .simple-grid, .review-grid { grid-template-columns: 1fr; gap: 30px; }
-      .form-group-title { font-size: 20px; margin-bottom: 17px; }
       .row-field { grid-template-columns: 52px minmax(0, 1fr); min-height: 75px; }
       .stat-grid { gap: 9px; }
       .stat-field { padding: 10px !important; }
@@ -995,7 +915,6 @@
       .btn-next, .btn-calc { min-width: 0; }
       .btn-back { flex: 0 0 auto; }
       .btn-next, .btn-calc { flex: 1; }
-      .calc-hint { text-align: left; }
       .result.section { margin-left: 0; padding: 24px 18px; }
       .summary-grid { grid-template-columns: 1fr; }
       .br-row { grid-template-columns: 56px 92px 1fr; gap: 8px; }
@@ -1013,9 +932,8 @@
           <path d="M16 2 L19 9 L26 8 L22 14 L28 18 L21 19 L22 26 L16 22 L10 26 L11 19 L4 18 L10 14 L6 8 L13 9 Z"/>
         </svg>
         <h1 class="wordmark">Maple<span class="em-w">Washer</span></h1>
-        <span class="tagline">HP/MP wash planner</span>
       </div>
-      <div class="meta-line">Build your wash plan</div>
+      <div class="meta-line">MapleLegends washing calculator</div>
     </header>
 
     <div class="wizard-layout">
@@ -1057,25 +975,17 @@
       <section class="wizard-card" aria-label="Wash plan builder">
         <form id="calc-form" novalidate>
           <div class="wizard-stage active" data-stage="0">
-            <div class="stage-kicker">Step 1 of 5</div>
-            <h2 class="stage-heading">Choose your class</h2>
-            <p class="stage-subtitle">We’ll tailor the HP and MP formulas to your character.</p>
             <div class="stage-body">
               <div class="field select-field">
                 <label for="i-class">Character class</label>
                 <select id="i-class" required></select>
-                <span class="hint" id="i-first-job-hint"></span>
               </div>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="1" hidden>
-            <div class="stage-kicker">Step 2 of 5</div>
-            <h2 class="stage-heading">Where is your character now?</h2>
-            <p class="stage-subtitle">Enter your current level and stats. You can type or paste values, then use Tab to move quickly.</p>
             <div class="stage-body form-columns">
               <div class="form-group">
-                <h3 class="form-group-title">Level &amp; resources</h3>
                 <div class="resource-fields">
                   <div class="field row-field">
                     <label for="i-cur-level">Level</label>
@@ -1094,8 +1004,6 @@
                 </div>
               </div>
               <div class="form-group">
-                <h3 class="form-group-title">Base stats</h3>
-                <p class="group-note">AP allocation only, excluding gear.</p>
                 <div class="stat-grid">
                   <div class="field stat-field">
                     <label for="i-cur-str">STR</label>
@@ -1119,12 +1027,8 @@
           </div>
 
           <div class="wizard-stage" data-stage="2" hidden>
-            <div class="stage-kicker">Step 3 of 5</div>
-            <h2 class="stage-heading">What are you building toward?</h2>
-            <p class="stage-subtitle">Set the level and HP/MP targets you want the plan to reach.</p>
             <div class="stage-body form-columns">
               <div class="form-group">
-                <h3 class="form-group-title">Destination</h3>
                 <div class="simple-grid">
                   <div class="field card-field">
                     <label for="i-target-level">Target level</label>
@@ -1133,12 +1037,10 @@
                   <div class="field card-field" id="f-swap-level">
                     <label for="i-swap-level">Swap level</label>
                     <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
-                    <span class="hint" id="i-swap-level-hint"></span>
                   </div>
                 </div>
               </div>
               <div class="form-group">
-                <h3 class="form-group-title">Target stats</h3>
                 <div class="simple-grid">
                   <div class="field card-field">
                     <label for="i-hp-goal">HP goal</label>
@@ -1156,33 +1058,23 @@
           </div>
 
           <div class="wizard-stage" data-stage="3" hidden>
-            <div class="stage-kicker">Step 4 of 5</div>
-            <h2 class="stage-heading">Add your gear &amp; buffs</h2>
-            <p class="stage-subtitle">Include the INT you expect to wear while levelling.</p>
             <div class="stage-body form-columns">
               <div class="form-group">
-                <h3 class="form-group-title">Equipment</h3>
                 <div class="field card-field">
                   <label for="i-gear-int">Gear INT</label>
                   <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
-                  <span class="hint">Treated as worn from level 10 onward.</span>
                 </div>
               </div>
               <div class="form-group">
-                <h3 class="form-group-title">Buffs</h3>
                 <div class="field card-field">
                   <label for="i-mw">Maple Warrior</label>
                   <select id="i-mw"></select>
-                  <span class="hint">Applied to Base INT only.</span>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="4" hidden>
-            <div class="stage-kicker">Step 5 of 5</div>
-            <h2 class="stage-heading">Review your wash plan</h2>
-            <p class="stage-subtitle">Check the details below, then calculate the most efficient route.</p>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
                 <div class="review-group-head"><h3>Class</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
@@ -1220,7 +1112,6 @@
               <button id="btn-next" type="button" class="btn-next">Continue <span aria-hidden="true">→</span></button>
               <button id="btn-calc" type="submit" class="btn-calc" hidden>Calculate plan <span class="arr" aria-hidden="true">→</span></button>
             </div>
-            <span class="calc-hint" id="calc-hint">Your values stay editable until you calculate.</span>
             <span class="calc-progress" id="calc-progress" role="status" aria-live="polite">
               <span class="calc-progress-track"><span class="calc-progress-bar" id="calc-progress-bar"></span></span>
               <span id="calc-progress-label">Calculating…</span>
@@ -1364,9 +1255,6 @@
       $('btn-back').hidden = currentWizardStep === 0;
       $('btn-next').hidden = currentWizardStep === wizardStages.length - 1;
       $('btn-calc').hidden = currentWizardStep !== wizardStages.length - 1;
-      $('calc-hint').textContent = currentWizardStep === wizardStages.length - 1
-        ? 'Calculation uses mid-range MapleLegends averages.'
-        : 'Press Enter or choose Continue to move to the next step.';
       showFormError(null);
 
       if (focusField) {
@@ -1723,7 +1611,6 @@
       const progress = $('calc-progress');
       const bar = $('calc-progress-bar');
       $('btn-calc').disabled = isRunning;
-      $('calc-hint').style.display = isRunning ? 'none' : '';
       progress.classList.toggle('active', isRunning);
       bar.classList.remove('indeterminate');
       bar.style.width = '0%';
@@ -1859,13 +1746,6 @@
       // Hidden alone removes the field visually; disabled also removes it from keyboard/form
       // interaction so Magicians genuinely have no Swap Level option.
       swapInput.disabled = isMage;
-      $('i-swap-level-hint').textContent = isMage
-        ? ''
-        : 'Playable from here — MP Wash stops and Base INT resets to your Main Stat.';
-      const requirement = classData.firstJobRequirement;
-      $('i-first-job-hint').textContent = requirement
-        ? `First job: lvl ${requirement.level} with at least ${requirement.minimum} ${requirement.stat}. These AP stay permanently allocated.`
-        : 'Beginner has no job-advancement stat requirement.';
       $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 5';
       if (currentWizardStep === wizardStages.length - 1) updateReview();
     }
