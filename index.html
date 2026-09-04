@@ -8,24 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,0..100&family=Inter+Tight:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #181410;
-      --bg-grain: #1d1814;
-      --surface: #221c17;
-      --surface-2: #2a221b;
-      --line: #4a3d2f;
-      --line-soft: #34291f;
-      --text: #f5ecd9;
-      --text-2: #e0d2b9;
-      --text-mute: #b2a08c;
-      --text-faint: #877766;
-      --maple: #d65d44;
-      --maple-glow: rgba(214, 93, 68, 0.2);
-      --amber: #e6b260;
-      --moss: #8aa674;
-      --clay: #c19370;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     @media (prefers-reduced-motion: reduce) {
@@ -219,6 +201,21 @@
       line-height: 1.35;
     }
     .clamp-note:empty { display: none; }
+    /* The in-field notes live on the Goals step, which is hidden by the time a plan is shown, so
+       the same clamps are repeated beside the result. */
+    .clamp-notice {
+      list-style: none;
+      margin: 0 0 22px;
+      padding: 0;
+    }
+    .clamp-notice:empty { display: none; }
+    .clamp-notice li {
+      color: var(--text-2);
+      font-family: 'Fraunces', serif;
+      font-size: 14px;
+      font-style: italic;
+      padding: 4px 0;
+    }
     .clamp-note .arr { font-style: normal; margin-right: 4px; opacity: 0.7; }
 
     .calc-row {
@@ -269,7 +266,7 @@
       width: 140px;
       height: 4px;
       border-radius: 2px;
-      background: var(--rule);
+      background: var(--line-soft);
       overflow: hidden;
     }
     .calc-progress-bar {
@@ -469,6 +466,9 @@
       font-family: 'JetBrains Mono', monospace;
       letter-spacing: 0;
     }
+    /* `.review-row` sets `display: flex`, which beats the UA sheet's `[hidden] { display: none }`
+       at equal specificity — without this the Magician Swap Level row stays visible. */
+    .review-row[hidden] { display: none; }
     .leveltable {
       max-height: 0;
       overflow: hidden;
@@ -544,11 +544,6 @@
       line-height: 1.55;
     }
 
-    /* Color contrast bumps for very-muted text */
-    @media (prefers-color-scheme: dark), (prefers-color-scheme: no-preference) {
-      :root { --text-faint: #9c8c79; }  /* was #877766 — bumped for WCAG AA */
-    }
-
     .footer {
       margin-top: 96px;
       padding-top: 32px;
@@ -584,13 +579,13 @@
       --line-soft: #e4dacb;
       --text: #151914;
       --text-2: #3f4b40;
-      --text-mute: #6f756d;
-      --text-faint: #8e8b82;
-      --maple: #ec3d24;
-      --maple-glow: rgba(236, 61, 36, 0.1);
-      --amber: #c99335;
+      --text-mute: #5c6159;
+      --text-faint: #6f6c64;
+      --maple: #c9301a;
+      --maple-glow: rgba(201, 48, 26, 0.1);
+      --amber: #8a6316;
       --moss: #0f5536;
-      --clay: #a26945;
+      --clay: #8a5535;
       --shadow: 0 28px 70px rgba(65, 48, 28, 0.08);
     }
 
@@ -889,14 +884,14 @@
     .btn-back:hover { border-color: var(--text-2); transform: translateX(-2px); }
     .btn-back[hidden] { display: none; }
     .btn-next, .btn-calc {
-      background: linear-gradient(135deg, #d3a34c, #bd8127);
-      border: 1px solid #a46e20;
+      background: linear-gradient(135deg, #9a6718, #82550e);
+      border: 1px solid #6d470b;
       box-shadow: 0 8px 18px rgba(147, 95, 22, .16);
       color: #fffdf8;
       margin-left: auto;
       min-width: 220px;
     }
-    .btn-next:hover, .btn-calc:hover { background: linear-gradient(135deg, #ddb35d, #c88c31); box-shadow: 0 11px 24px rgba(147, 95, 22, .23); transform: translateY(-1px); }
+    .btn-next:hover, .btn-calc:hover { background: linear-gradient(135deg, #8c5d14, #744b0c); box-shadow: 0 11px 24px rgba(147, 95, 22, .23); transform: translateY(-1px); }
     .btn-calc[hidden], .btn-next[hidden] { display: none; }
     .btn-calc[disabled] { cursor: progress; opacity: .6; }
     .calc-progress { color: var(--text-mute); justify-content: flex-end; margin-top: 12px; }
@@ -1025,12 +1020,10 @@
                 <div class="field card-field">
                   <label for="i-cur-hp">HP</label>
                   <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
-                  <span class="clamp-note" id="i-cur-hp-clamp-note"></span>
                 </div>
                 <div class="field card-field">
                   <label for="i-cur-mp">MP</label>
                   <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
-                  <span class="clamp-note" id="i-cur-mp-clamp-note"></span>
                 </div>
               </div>
               <div class="field-stack">
@@ -1093,7 +1086,7 @@
           </div>
 
           <div class="wizard-stage" data-stage="3" hidden>
-            <h2 class="stage-heading">Review</h2>
+            <h2 class="stage-heading" tabindex="-1">Review</h2>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
                 <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
@@ -1123,7 +1116,7 @@
           </div>
 
           <div class="wizard-footer">
-            <div class="form-error" id="form-error" role="alert" aria-live="polite" hidden></div>
+            <div class="form-error" id="form-error" role="alert" hidden></div>
             <div class="wizard-actions">
               <button id="btn-back" type="button" class="btn-back" hidden><span aria-hidden="true">←</span> Back</button>
               <button id="btn-next" type="button" class="btn-next">Continue <span aria-hidden="true">→</span></button>
@@ -1146,6 +1139,8 @@
       </div>
 
       <div id="infeas-block" role="alert" aria-live="assertive"></div>
+
+      <ul class="clamp-notice" id="clamp-notice"></ul>
 
       <div id="summary-block">
         <div class="summary-grid" id="summary-grid"></div>
@@ -1173,25 +1168,26 @@
         <span class="section-rule"></span>
       </div>
 
-      <button class="leveltable-toggle" id="leveltable-toggle">
+      <button class="leveltable-toggle" id="leveltable-toggle" type="button"
+              aria-expanded="false" aria-controls="leveltable">
         <span class="triangle">▶</span>
         <span class="ltlabel">Show full level table</span>
         <span class="count" id="leveltable-count"></span>
       </button>
 
       <div class="leveltable" id="leveltable">
-        <div class="leveltable-inner">
+        <div class="leveltable-inner" hidden>
           <table class="lt" id="lt-table">
             <thead>
               <tr>
-                <th>lvl</th>
-                <th>hp</th>
-                <th>mp</th>
-                <th>base int</th>
-                <th>non-int pool</th>
-                <th class="phase-col">phase</th>
-                <th>resets / lvl</th>
-                <th>cumul. resets</th>
+                <th scope="col">lvl</th>
+                <th scope="col">hp</th>
+                <th scope="col">mp</th>
+                <th scope="col">base int</th>
+                <th scope="col">non-int pool</th>
+                <th class="phase-col" scope="col">phase</th>
+                <th scope="col">resets / lvl</th>
+                <th scope="col">cumul. resets</th>
               </tr>
             </thead>
             <tbody id="lt-body"></tbody>
@@ -1248,6 +1244,7 @@
       button.setAttribute('aria-expanded', 'false');
       const valueEl = document.createElement('span');
       valueEl.className = 'listbox-value';
+      valueEl.id = select.id + '-value';
       const icon = document.createElement('span');
       icon.className = 'listbox-icon';
       icon.setAttribute('aria-hidden', 'true');
@@ -1265,6 +1262,11 @@
       if (label) {
         label.htmlFor = button.id;
         list.setAttribute('aria-label', label.textContent);
+        // A <label for> does not contribute to a <button>'s accessible name (HTML-AAM computes it
+        // from aria-labelledby / aria-label / its subtree), so name the button explicitly —
+        // otherwise it announces just "Assassin, combobox" with no hint of which field it is.
+        if (!label.id) label.id = select.id + '-label';
+        button.setAttribute('aria-labelledby', label.id + ' ' + valueEl.id);
       }
       wrap.append(button, list);
 
@@ -1298,9 +1300,13 @@
       function setActive(index, scroll = true) {
         if (index < 0 || index >= list.children.length) return;
         optionAt(activeIndex)?.removeAttribute('data-active');
+        // APG's select-only combobox pattern moves aria-selected with the active option. Leaving
+        // it on the committed one makes arrow-keying announce every option as "not selected".
+        optionAt(activeIndex)?.setAttribute('aria-selected', 'false');
         activeIndex = index;
         const item = optionAt(index);
         item.dataset.active = 'true';
+        item.setAttribute('aria-selected', 'true');
         button.setAttribute('aria-activedescendant', item.id);
         if (scroll) item.scrollIntoView({ block: 'nearest' });
       }
@@ -1364,7 +1370,11 @@
         const options = [...select.options].map(option => option.textContent.toLowerCase());
         const from = open ? activeIndex : select.selectedIndex;
         for (let step = 1; step <= options.length; step++) {
-          const index = (from + (typed.length > 1 ? 0 : step) + options.length) % options.length;
+          // A continuing multi-character search starts at the active option (offset 0) and walks
+          // on from there; a fresh single character starts at the one after it. Using a constant
+          // 0 for the whole loop re-tested the active option `options.length` times, so no
+          // multi-character prefix could ever match.
+          const index = (from + (typed.length > 1 ? step - 1 : step) + options.length) % options.length;
           if (options[index].startsWith(typed)) {
             if (open) setActive(index);
             else commit(index);
@@ -1431,11 +1441,11 @@
       put('stats', `${$('i-cur-str').value} · ${$('i-cur-dex').value} · ${$('i-cur-luk').value} · ${$('i-cur-int').value}`);
       // Only the AP above the class floors can ever become INT, so the review shows the pool the
       // plan actually has to spend rather than leaving it to be worked out from the three stats.
-      put('pool', nonIntPool(CLASSES[classSelect.value], {
-        str: Number($('i-cur-str').value),
-        dex: Number($('i-cur-dex').value),
-        luk: Number($('i-cur-luk').value),
-      }));
+      // Review can be opened while a stat is mid-edit (blank or a rejected value), and
+      // Math.max(0, NaN - 4) is NaN — show a dash rather than "Non-INT pool: NaN".
+      const poolStats = { str: readField('i-cur-str'), dex: readField('i-cur-dex'), luk: readField('i-cur-luk') };
+      put('pool', Object.values(poolStats).some(v => v === null) ? '—'
+        : nonIntPool(CLASSES[classSelect.value], poolStats));
       put('target-level', $('i-target-level').value);
       put('goals', `${$('i-hp-goal').value}\u00a0HP · ${$('i-mp-goal').value}\u00a0MP`);
       put('swap', $('i-swap-level').value);
@@ -1470,8 +1480,13 @@
 
       if (focusField) {
         requestAnimationFrame(() => {
-          const firstControl = wizardStages[currentWizardStep].querySelector('input:not([disabled]), select:not([disabled])');
-          if (firstControl) firstControl.focus({ preventScroll: true });
+          const stage = wizardStages[currentWizardStep];
+          // `.listbox-button` first: the native <select> it replaces is display:none and so is
+          // not focusable. Review has no control at all, so fall back to its heading — otherwise
+          // focus lands on <body> right after the button the user clicked was hidden.
+          const firstControl = stage.querySelector(
+            '.listbox-button:not([disabled]), input:not([disabled]), select:not([disabled])');
+          (firstControl || stage.querySelector('.stage-heading'))?.focus({ preventScroll: true });
         });
       }
     }
@@ -1488,27 +1503,52 @@
         }
       }
 
-      if (stepIndex === 2) {
+      // Stage 1 is Goals — where Target Level and Swap Level live. Running these checks on
+      // stage 2 (Gear & buffs) reported the error a step late and then tried to focus a field
+      // inside a hidden stage.
+      if (stepIndex === 1) {
         const currentLevel = Number($('i-cur-level').value);
         const targetLevel = Number($('i-target-level').value);
         const swapLevel = Number($('i-swap-level').value);
         const isMage = CLASSES[classSelect.value].isMage;
-        if (targetLevel <= currentLevel) {
-          $('i-target-level').closest('.field').classList.add('invalid');
-          showFormError(`Target Level (${targetLevel}) must be greater than Current Level (${currentLevel}).`);
-          $('i-target-level').focus();
-          return false;
-        }
-        if (!isMage && (swapLevel < currentLevel || swapLevel > targetLevel)) {
-          $('i-swap-level').closest('.field').classList.add('invalid');
-          showFormError(`Swap Level must be between Current Level (${currentLevel}) and Target Level (${targetLevel}).`);
-          $('i-swap-level').focus();
+        const levelError = levelRelationError(currentLevel, targetLevel, swapLevel, isMage);
+        if (levelError) {
+          const field = $(levelError.fieldId);
+          field.closest('.field').classList.add('invalid');
+          showFormError(levelError.msg, field);
+          field.focus();
           return false;
         }
       }
       showFormError(null);
       return true;
     }
+
+    // The wizard's Goals step and runCalc both police the same three level relationships. They used
+    // to carry three different wordings for the same rule, which drifted; this is the single source.
+    function levelRelationError(currentLevel, targetLevel, swapLevel, isMage) {
+      if (targetLevel <= currentLevel) {
+        return {
+          fieldId: 'i-target-level',
+          msg: `Target Level (${targetLevel}) must be greater than Current Level (${currentLevel}).`,
+        };
+      }
+      // Swap Level may equal Target Level (everything collapses at the goal level) but never exceed
+      // it, and it cannot precede the character's current level. Mages have no swap.
+      if (!isMage && (swapLevel < currentLevel || swapLevel > targetLevel)) {
+        return {
+          fieldId: 'i-swap-level',
+          msg: `Swap Level (${swapLevel}) must be between Current Level (${currentLevel}) and `
+            + `Target Level (${targetLevel}).`,
+        };
+      }
+      return null;
+    }
+
+    // The HP/MP caps live in engine.js; mirror them onto the inputs rather than repeating 30000 in
+    // four max="" attributes that nothing keeps in step with the engine.
+    for (const id of ['i-cur-hp', 'i-hp-goal']) $(id).max = String(MAX_HP);
+    for (const id of ['i-cur-mp', 'i-mp-goal']) $(id).max = String(MAX_MP);
 
     function advanceWizard() {
       if (!validateWizardStep(currentWizardStep)) return;
@@ -1533,24 +1573,34 @@
     });
     calcForm.addEventListener('input', event => {
       event.target.closest('.field')?.classList.remove('invalid');
+      showFormError(null);
+      // A clamp note describes the run that produced it; once an input changes it is stale.
+      document.querySelectorAll('.clamp-note').forEach(el => { el.textContent = ''; });
+      $('clamp-notice').textContent = '';
       if ($('result').classList.contains('shown')) {
         ['result', 'phases-section', 'leveltable-section'].forEach(id => $(id).classList.remove('shown'));
       }
     });
 
-    // Read one numeric field; returns the parsed Number or null if blank / non-finite.
-    // Bound checks against the input's min/max attributes are respected.
+    // Read one numeric field; returns the parsed Number or null if blank / non-finite /
+    // non-integer. Bound checks against the input's min/max attributes are respected.
+    // Integrality is not optional: every input here is step="1", and the engine iterates levels
+    // with `L++`, so a fractional level would step straight past every job-advancement test.
     function readField(id) {
       const el = $(id);
       const raw = el.value.trim();
       if (raw === '') return null;
       const n = Number(raw);
-      if (!Number.isFinite(n)) return null;
+      if (!Number.isInteger(n)) return null;
       const min = el.min !== '' ? Number(el.min) : -Infinity;
       const max = el.max !== '' ? Number(el.max) : Infinity;
       if (n < min || n > max) return null;
       return n;
     }
+
+    const NUMERIC_FIELD_IDS = ['i-cur-level', 'i-cur-hp', 'i-cur-mp', 'i-cur-str', 'i-cur-dex',
+      'i-cur-luk', 'i-cur-int', 'i-target-level', 'i-swap-level', 'i-hp-goal', 'i-mp-goal',
+      'i-gear-int'];
 
     function readInputs() {
       const className = classSelect.value;
@@ -1590,20 +1640,40 @@
     // below the relevant input field.
     function renderClampNotes(notes) {
       document.querySelectorAll('.clamp-note').forEach(el => { el.innerHTML = ''; });
+      const notice = $('clamp-notice');
+      notice.textContent = '';
       for (const n of notes) {
         const el = document.getElementById(n.fieldId + '-clamp-note');
-        if (!el) continue;
-        el.innerHTML = `<span class="arr">↳</span>Using ${fmt(n.clamped)} (Min ${n.stat} for ${n.className} at lvl ${n.atLevel})`;
+        if (el) {
+          el.innerHTML = `<span class="arr">↳</span>Using ${fmt(n.clamped)} (Min ${n.stat} for ${n.className} at lvl ${n.atLevel})`;
+        }
+        // The Goals step is hidden while the plan is on screen, so repeat the clamp next to the
+        // result — this is the only place the user learns the engine planned for a raised goal.
+        const item = document.createElement('li');
+        item.textContent = `Your ${n.label} was below the minimum possible ${n.stat} for a `
+          + `${n.className} at level ${n.atLevel}, so this plan targets ${fmt(n.clamped)} ${n.stat}.`;
+        notice.appendChild(item);
       }
     }
 
-    function showFormError(msg) {
+    // `control`, when given, is the input the message is about: it gets aria-invalid and is
+    // described by the message, so the state and the reason both reach assistive tech rather
+    // than only the visual `.field.invalid` outline.
+    function showFormError(msg, control = null) {
       const el = $('form-error');
       if (msg) { el.textContent = msg; el.hidden = false; }
       else { el.hidden = true; }
+      document.querySelectorAll('[aria-invalid="true"]').forEach(previous => {
+        previous.removeAttribute('aria-invalid');
+        previous.removeAttribute('aria-describedby');
+      });
+      if (msg && control) {
+        control.setAttribute('aria-invalid', 'true');
+        control.setAttribute('aria-describedby', 'form-error');
+      }
     }
 
-    function animateNumber(el, start, end, duration = 700, suffix = '') {
+    function animateNumber(el, start, end, duration = 700) {
       const startTime = performance.now();
       const tick = (t) => {
         const elapsed = t - startTime;
@@ -1619,7 +1689,9 @@
     const opLabels = {
       // Shift source is the non-INT pool (player picks the stat); literal — no STAT substitution.
       shift_up:   { op: '-Non-INT +INT', label: 'Mid-progress shift to INT (drawn from your non-INT pool)' },
-      mpWash:     { op: '-MP +INT/STAT', label: 'MP Wash cycles' },
+      shift_down: { op: '-INT +Main Stat', label: 'Mid-progress shift out of INT' },
+      // A Mage's Main Stat IS INT, so the generic STAT substitution renders "-MP +INT/INT".
+      mpWash:     { op: '-MP +INT/STAT', opMage: '-MP +INT', label: 'MP Wash cycles' },
       phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash' },
       intReset:   { op: '-INT +STAT', label: 'Reset Base INT' },
       staleHPWash:{ op: '-MP +HP', label: 'Stale HP Wash (mid-flight + cleanup)' },
@@ -1630,17 +1702,16 @@
       const phasesSection = $('phases-section');
       const leveltableSection = $('leveltable-section');
 
-      $('leveltable').classList.remove('open');
-      $('leveltable-toggle').classList.remove('open');
-      $('leveltable-toggle').querySelector('.ltlabel').textContent = 'Show full level table';
+      setLevelTableOpen(false);
 
       if (!result.feasible) {
         $('infeas-block').innerHTML = `
           <div class="infeas">
             <div class="infeas-head">This plan is not reachable</div>
-            <div class="infeas-body">${result.reason}</div>
+            <div class="infeas-body"></div>
           </div>
         `;
+        $('infeas-block').querySelector('.infeas-body').textContent = result.reason;
         $('summary-block').style.display = 'none';
         phasesSection.style.display = 'none';
         leveltableSection.style.display = 'none';
@@ -1654,7 +1725,7 @@
       leveltableSection.style.display = '';
 
       const p = result.params;
-      const isMage = input.classData.mainStat === 'INT';
+      const isMage = input.classData.isMage;
       const nxCost = result.apResets * NX_PER_AP_RESET;
       const days = Math.ceil(nxCost / MAX_NX_PER_DAY_PER_ACCOUNT);
 
@@ -1668,7 +1739,8 @@
           </div>
           <div class="stat-line">
             <span class="stat-label">Start MP Wash at</span>
-            <span class="stat-value">${result.breakdown.mpWash > 0 ? `lvl ${p.mpWashFirstLevel}` : 'Not needed'}</span>
+            <span class="stat-value">${result.breakdown.mpWash > 0 && p.mpWashFirstLevel !== null
+              ? `lvl ${p.mpWashFirstLevel}` : 'Not needed'}</span>
           </div>
           <div class="stat-line">
             <span class="stat-label">${input.classData.isMage ? 'Stale HP Wash starts at' : 'Swap Level'}</span>
@@ -1700,7 +1772,7 @@
             <span class="stat-value feature" id="anim-nx">${fmt(nxCost)}<span class="unit">NX</span></span>
           </div>
           <div class="stat-line">
-            <span class="stat-label">Days at 6,500 NX / day</span>
+            <span class="stat-label">Days at ${fmt(MAX_NX_PER_DAY_PER_ACCOUNT)} NX / day</span>
             <span class="stat-value" id="anim-days">${fmt(days)}<span style="font-family:'Inter Tight'; font-size: 13px; color: var(--text-2); margin-left: 8px; font-weight: 400;">one account</span></span>
           </div>
         </div>
@@ -1727,10 +1799,13 @@
         .filter(([key, count]) => typeof count === 'number' && count > 0)
         .sort(([, a], [, b]) => b - a);
       const breakdownHTML = breakdownEntries.map(([key, count]) => {
-        const metaKey = key === 'shift' ? 'shift_up' : key;
+        // shiftDir is a sibling key on the breakdown, so read the direction rather than assuming it.
+        const metaKey = key === 'shift'
+          ? (result.breakdown.shiftDir === 'down' ? 'shift_down' : 'shift_up')
+          : key;
         const meta = opLabels[metaKey];
         if (!meta) return '';  // skip non-display keys (shiftDir)
-        const op = meta.op.replace(/STAT/g, mainStat);
+        const op = (isMage && meta.opMage ? meta.opMage : meta.op).replace(/STAT/g, mainStat);
         return `
           <div class="br-row">
             <span class="br-count">${fmt(count)}</span>
@@ -1837,6 +1912,7 @@
 
     function showResult(input, result) {
       setCalcRunning(false);
+      showFormError(null);
       renderResult(input, result);
       requestAnimationFrame(() => {
         $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1878,7 +1954,9 @@
         if (calcWorker === worker) calcWorker = null;
         worker.terminate();
         if (token !== runToken) return;
-        setCalcRunning(false);
+        // Stay in the running state: runInline is about to block this thread, and the progress
+        // element it writes to is hidden unless `active` is set.
+        setCalcRunning(true);
         showFormError('Background calculation unavailable; running on the main thread.');
         runInline(input, token);
       };
@@ -1890,7 +1968,7 @@
         if (calcWorker === worker) calcWorker = null;
         worker.terminate();
         if (token !== runToken) return;
-        setCalcRunning(false);
+        setCalcRunning(true);
         showFormError('Background calculation unavailable; running on the main thread.');
         runInline(input, token);
       }
@@ -1910,24 +1988,27 @@
     }
 
     function runCalc() {
+      // Steps can be revisited freely once Review has been reached, so the per-stage validation
+      // has to run again here — otherwise an edit made after the first pass reaches the engine
+      // unchecked. Jumps to the offending stage so the error is next to its field.
+      for (let stage = 0; stage < wizardStages.length - 1; stage++) {
+        if (!validateWizardStep(stage)) {
+          if (currentWizardStep !== stage) setWizardStep(stage);
+          validateWizardStep(stage);
+          return;
+        }
+      }
       const input = readInputs();
       if (!input) {
-        showFormError('Fill in every field with a value in its allowed range to calculate.');
+        showFormError('Fill in every field with a whole number in its allowed range to calculate.',
+          NUMERIC_FIELD_IDS.map($).find(el => !el.disabled && readField(el.id) === null));
         return;
       }
-      // Cross-field validation
-      if (input.currentState.level >= input.goals.targetLevel) {
-        showFormError(`Target Level (${input.goals.targetLevel}) must be greater than Current Level (${input.currentState.level}).`);
-        return;
-      }
-      // Swap Level may equal Target Level (everything collapses at the goal level) but never exceed it,
-      // and it cannot precede the character's current level.
-      if (!input.classData.isMage && input.goals.swapLevel > input.goals.targetLevel) {
-        showFormError(`Swap Level (${input.goals.swapLevel}) cannot be greater than Target Level (${input.goals.targetLevel}).`);
-        return;
-      }
-      if (!input.classData.isMage && input.goals.swapLevel < input.currentState.level) {
-        showFormError(`Swap Level (${input.goals.swapLevel}) cannot be lower than Current Level (${input.currentState.level}).`);
+      // Cross-field validation — same rules the Goals step enforces.
+      const levelError = levelRelationError(input.currentState.level, input.goals.targetLevel,
+        input.goals.swapLevel, input.classData.isMage);
+      if (levelError) {
+        showFormError(levelError.msg, $(levelError.fieldId));
         return;
       }
       showFormError(null);
@@ -1961,16 +2042,30 @@
 
     classSelect.addEventListener('change', syncSwapVisibility);
 
-    $('leveltable-toggle').addEventListener('click', () => {
-      $('leveltable').classList.toggle('open');
-      $('leveltable-toggle').classList.toggle('open');
-      const isOpen = $('leveltable').classList.contains('open');
-      $('leveltable-toggle').querySelector('.ltlabel').textContent =
+    // The collapse is a max-height transition, which hides the rows visually but leaves them in
+    // the accessibility tree and in Tab order — so toggle `hidden` on the inner scroller too.
+    function setLevelTableOpen(isOpen) {
+      const table = $('leveltable');
+      const toggle = $('leveltable-toggle');
+      table.classList.toggle('open', isOpen);
+      toggle.classList.toggle('open', isOpen);
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      table.querySelector('.leveltable-inner').hidden = !isOpen;
+      toggle.querySelector('.ltlabel').textContent =
         isOpen ? 'Hide full level table' : 'Show full level table';
+    }
+
+    $('leveltable-toggle').addEventListener('click', () => {
+      setLevelTableOpen(!$('leveltable').classList.contains('open'));
     });
 
     syncSwapVisibility();
     setWizardStep(0, false);
+
+    // Back/forward navigation restores form values from the browser's cache *after* the script has
+    // run, so the class-dependent UI (the Swap Level field) can be left contradicting the restored
+    // class. Re-derive it once the restored values are in place.
+    window.addEventListener('pageshow', event => { if (event.persisted) syncSwapVisibility(); });
   </script>
 </body>
 </html>

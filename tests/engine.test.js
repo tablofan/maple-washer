@@ -40,7 +40,7 @@ const exportList = [
   'naturalMPGainAtLevel',
   'freshAPAtLevel', 'freshAPInRange', 'firstJobAPNeeded',
   'firstJobRequirementAPAtLevel', 'usableFreshAPAtLevel', 'usableFreshAPInRange',
-  'nonIntPool', 'nonIntStatFloor',
+  'nonIntPool', 'nonIntStatFloor', 'precomputeRanges',
 ];
 fs.writeFileSync(tmpModule, classesSrc + '\n' + engineSrc + '\n' + `module.exports = { ${exportList.join(', ')} };`);
 process.on('exit', () => { try { fs.unlinkSync(tmpModule); } catch {} });
@@ -128,6 +128,11 @@ function plan(opts) {
   if (goals.swapLevel === null) goals.swapLevel = goals.targetLevel;
   const gearInt = opts.gearInt ?? 40;
   const mwMultiplier = opts.mwMultiplier ?? 1.0;
+  // Memoised on the resolved inputs. Many tests assert different facets of the same plan, and a
+  // full 1->180 search costs tens of seconds — recomputing it per assertion was about half the
+  // suite's runtime. No test mutates a result, so sharing the object between them is safe.
+  const key = JSON.stringify([opts.class, currentState, goals, gearInt, mwMultiplier]);
+  if (planCache.has(key)) return planCache.get(key);
   const r = optimize(classData, currentState, goals, gearInt, mwMultiplier);
   // Stash the className / inputs back into the result for tests that need them.
   if (r && r.params) {
@@ -135,8 +140,11 @@ function plan(opts) {
     r.__state = currentState;
     r.__goals = goals;
   }
+  planCache.set(key, r);
   return r;
 }
+
+const planCache = new Map();
 
 // ────────────────────────── reference cases ──────────────────────────
 // Calibrated against Krythan's published sheet defaults.
@@ -539,9 +547,42 @@ describe('Boundary cases', () => {
 // ────────────────────────── infeasibility cases ──────────────────────────
 
 describe('Infeasibility detection', () => {
-  test('Magician requesting 30k HP at lvl 50 is infeasible', () => {
-    const r = plan({ class: 'Magician', goals: { hpGoal: 30000, mpGoal: 1000, targetLevel: 50 }, gearInt: 0 });
-    assertInfeasible(r);
+  test('Magician requesting 30k HP at lvl 50 hits the HP ceiling', () => {
+    // mpGoal must clear the class MP floor at lvl 50 (1549), or the MP-floor branch fires first and
+    // this becomes a duplicate of the Brawler test below rather than an HP-ceiling test.
+    const r = plan({ class: 'Magician', goals: { hpGoal: 30000, mpGoal: 1600, targetLevel: 50 }, gearInt: 0 });
+    assertInfeasible(r, 'most HP reachable');
+  });
+
+  test('HP Goal below the class Min HP is rejected with the floor named', () => {
+    const r = plan({ class: 'Fighter', goals: { hpGoal: 100, mpGoal: 2000, targetLevel: 180 } });
+    assertInfeasible(r, 'below the minimum possible HP');
+  });
+
+  test('A character too far past the first job advancement to meet its requirement is rejected', () => {
+    // Lvl 9 with 4 STR: one level of AP left (5) against the 31 STR the Warrior advancement needs.
+    const r = plan({
+      class: 'Fighter',
+      current: { level: 9, hp: 400, mp: 100, str: 4, dex: 4, luk: 4, baseInt: 4 },
+      goals: { hpGoal: 5000, mpGoal: 500, targetLevel: 60 },
+    });
+    assertInfeasible(r, 'not enough AP remaining to reach 35 STR');
+  });
+
+  test('An unreachable HP Goal names the HP reached, not a negative MP', () => {
+    // Regression: the cleanup wash count is what the HP Goal *demands*, so an unreachable goal used
+    // to surface as "Final MP (-18963) would be below Min MP (1115)" — a symptom, and the number
+    // was nonsense. Every candidate must now report the HP its MP can actually pay for.
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 70 } });
+    assertInfeasible(r, 'most HP reachable');
+    assertTrue(!/Final MP/.test(r.reason), `should not surface a per-candidate MP failure: "${r.reason}"`);
+    const reached = Number(r.reason.match(/is about ([\d,]+)/)[1].replace(/,/g, ''));
+    assertInRange(reached, 1, 30000, 'the reported HP ceiling is a real HP value');
+  });
+
+  test('An MP Goal beyond what the plan can generate reports the MP reached', () => {
+    const r = plan({ class: 'Fighter', goals: { hpGoal: 20000, mpGoal: 25000, targetLevel: 120 } });
+    assertInfeasible(r, 'most MP reachable');
   });
 
   test('MP Goal below class Min MP is infeasible with explicit reason', () => {
@@ -587,6 +628,29 @@ describe('Infeasibility detection', () => {
   test('Out-of-range Target Level is rejected', () => {
     const r = plan({ class: 'Assassin', goals: { hpGoal: 5000, mpGoal: 3000, targetLevel: 250 } });
     assertInfeasible(r, 'Target Level');
+  });
+
+  test('A candidate whose peak MP breaches the 30k cap is rejected by name', () => {
+    // Driven through evaluateStrategy rather than optimize: the whole point of the filter is that
+    // optimize never returns such a candidate, so the only way to see the rejection is to hand it
+    // one. Target Base INT 400 on an Assassin washing 20->180 peaks at ~34.3k MP.
+    const cd = CLASSES['Assassin'];
+    const cur = { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 };
+    const goals = { hpGoal: 5000, mpGoal: 3000, targetLevel: 180, swapLevel: 180 };
+    const ranges = mod.precomputeRanges(cd, cur.level, goals.targetLevel);
+    const params = {
+      targetBaseInt: 400, mpWashStart: 20, mpWashEnd: 180, mpWashStop: 180, shift: 0,
+      preSwapFreshAtBoundary: 0, swapSeedFreshHPResets: 0,
+      phase3FreshHPResets: 0, staleHPPerLevelPhase3: 0,
+    };
+    const over = mod.evaluateStrategy(cd, cur, goals, 40, 1.0, params, ranges);
+    assertTrue(!over.feasible, 'the over-cap candidate must be rejected');
+    assertTrue(/overshoots the 30,000 MP cap/.test(over.reason),
+      `expected the MP-cap reason, got: "${over.reason}"`);
+    // Same shape at a Target Base INT that fits: the filter is selective, not blanket.
+    const under = mod.evaluateStrategy(cd, cur, goals, 40, 1.0,
+      Object.assign({}, params, { targetBaseInt: 200 }), ranges);
+    assertTrue(under.feasible, `the in-cap candidate should survive, got: "${under.reason}"`);
   });
 
   test('Plans overshooting the 30k MP cap are filtered out', () => {
@@ -733,9 +797,12 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
     assertFeasible(feasible);
     // 10000 HP exceeds the Mage's natural+wash ceiling at 30k MP (only reachable with HP equips/challenges).
     const tooHigh = plan({ class: 'Magician', goals: { hpGoal: 10000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
-    assertInfeasible(tooHigh);
-    // The reason should be about HP reachability, not a misleading "overshoots MP cap".
-    assertTrue(/HP goal|HP\b/i.test(tooHigh.reason), `reason should mention HP, got: "${tooHigh.reason}"`);
+    assertInfeasible(tooHigh, 'most HP reachable');
+    // Pin the ceiling itself. A ±12% drift used to pass, because 8,000 feasible / 10,000 infeasible
+    // is a 2,000 HP bracket. Krythan's sheet shows ~7,700 without gear INT; ours reports 8,998 with
+    // 40 INT of gear, which is the same ballpark from a more generous starting point.
+    const ceiling = Number(tooHigh.reason.match(/is about ([\d,]+)/)[1].replace(/,/g, ''));
+    assertInRange(ceiling, 8900, 9100, 'reported Mage HP ceiling at 30k MP');
   });
   test('Cap-wash apResets = mpWash + capWashes + intReset(0 for Mage) + shift', () => {
     const r = plan({ class: 'Magician', goals: { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
@@ -763,14 +830,16 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
     assertEq(last.cumulativeResets, r.apResets,
       'level table schedules every Mage reset');
   });
-  test('Cap-wash level table final row reconciles with summary (±1% tolerance)', () => {
+  test('Cap-wash level table final row reconciles with the summary exactly', () => {
     const r = plan({ class: 'Magician', goals: { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
     assertFeasible(r);
     const rows = levelTable(CLASSES['Magician'], { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 }, { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, 40, 1.0, r);
     const last = rows[rows.length - 1];
-    // Per-level floor() accumulates slightly differently than the analytical single-floor; allow 1%.
-    assertTrue(Math.abs(last.mp - r.finalMP) <= 300, `last row MP ${last.mp} vs summary ${r.finalMP}`);
-    assertTrue(Math.abs(last.hp - r.finalHP) <= Math.max(200, r.finalHP * 0.02), `last row HP ${last.hp} vs summary ${r.finalHP}`);
+    // Exact, not tolerant. `optimize` reports the walk's own numbers (see ADR 0001), so any drift
+    // here means the summary and the table have come apart — the one thing that must never happen.
+    // The old ±300 MP / ±2% HP slack would have hidden it; the measured delta is 0.
+    assertEq(last.mp, r.finalMP, 'last row MP matches the summary');
+    assertEq(last.hp, r.finalHP, 'last row HP matches the summary');
   });
 });
 
@@ -934,13 +1003,16 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     }
   });
 
-  test('Intermediate pre-Swap MP cap violations are rejected', () => {
+  test('A Stale HP Wash with no fresh AP in the HP/MP Pool is rejected', () => {
+    // Named for what it actually reaches. This fixture leaves no free AP at the swap level to seed
+    // the pool, so every candidate fails the pool rule — not the MP cap, which the test above
+    // covers directly.
     const r = plan({
       class: 'Fighter',
       current: { level: 160, hp: 22500, mp: 29400, baseInt: 500 },
       goals: { hpGoal: 30000, mpGoal: 29900, targetLevel: 180, swapLevel: 180 },
     });
-    assertInfeasible(r);
+    assertInfeasible(r, 'HP/MP Pool');
   });
 
   test('Stale-heavy plans search the exact MP Wash end needed for the MP Goal', () => {
@@ -1058,7 +1130,8 @@ describe('Non-INT pool', () => {
   });
 
   test('The UI shows the pool in the level table and on the review step', () => {
-    assertTrue(indexSrc.includes('<th>non-int pool</th>'),
+    // Attribute-tolerant: the header may carry scope="col" or a class without changing intent.
+    assertTrue(/<th[^>]*>non-int pool<\/th>/.test(indexSrc),
       'the level table heads the column "non-int pool"');
     assertTrue(indexSrc.includes('<td>${fmt(r.nonIntPool)}</td>'),
       'the level table renders row.nonIntPool');
@@ -1066,7 +1139,8 @@ describe('Non-INT pool', () => {
       'the per-class Main Stat header is gone');
     assertTrue(indexSrc.includes('data-review="stats"') && indexSrc.includes('data-review="pool"'),
       'review keeps the raw stats and adds the pool alongside them');
-    assertTrue(indexSrc.includes("put('pool', nonIntPool(CLASSES[classSelect.value]"),
+    // Line-break tolerant: the call wraps once the null guard is inlined.
+    assertTrue(/put\('pool',[\s\S]{0,120}?nonIntPool\(CLASSES\[classSelect\.value\]/.test(indexSrc),
       'the review pool is computed with the engine helper');
     assertTrue(indexSrc.includes("op: '-Non-INT +INT'"),
       'the breakdown names the pool as the shift source');
@@ -1083,8 +1157,11 @@ describe('4-stat shift budget', () => {
       goals: { hpGoal: 5000, mpGoal: 10000, targetLevel: 180 },
     });
     assertFeasible(r);
-    // The optimizer is free to use the LUK pool — shift may be > 0 if cheaper.
-    assertTrue(r.breakdown.shift >= 0, 'shift count is non-negative');
+    // 50 LUK against a floor of 4 is a 46-point budget, and the shift is capped by it whether or
+    // not this fixture spends any of it. (`shift >= 0` was unfalsifiable for an unsigned count.)
+    assertEq(nonIntPool(CLASSES['Magician'], r.__state), 46, 'the LUK surplus is the shift budget');
+    assertTrue(r.breakdown.shift <= 46, `shift ${r.breakdown.shift} within the LUK budget`);
+    if (r.breakdown.shift > 0) assertEq(r.breakdown.shiftDir, 'up', 'a Mage only shifts into INT');
   });
 
   test('Optimizer can shift from a non-MainStat stat (e.g., DEX on a Assassin)', () => {
@@ -1108,9 +1185,9 @@ describe('4-stat shift budget', () => {
       goals: { hpGoal: 5000, mpGoal: 10000, targetLevel: 180 },
     });
     assertFeasible(r);
-    if (r.breakdown.shift > 0) {
-      assertTrue(r.breakdown.shiftDir !== 'down', 'Mages should not shift INT down');
-    }
+    // Unconditional: the guarded form silently asserted nothing whenever the fixture chose shift 0,
+    // which is exactly what this Mage does. A down-shift must never appear, at any shift count.
+    assertTrue(r.breakdown.shiftDir !== 'down', 'Mages should not shift INT down');
   });
 });
 
@@ -1200,6 +1277,20 @@ describe('Swap Level', () => {
     assertFeasible(r);
     assertTrue(r.params.swapBurst > 0, 'a swap burst was scheduled');
     assertTrue(r.params.hpAtSwap > 5000, 'HP at the swap level is substantial');
+    // Collapsing the swap onto Target Level gives the burst nowhere to go: the same conversion
+    // happens, at the end, against far more banked HP. Note what is NOT asserted — that the early
+    // swap costs no more. Moving the Swap Level changes the whole strategy, not just where the
+    // burst lands, and its sibling test ('A later Swap Level can be cheaper...') pins the opposite
+    // direction: retaining INT to level 200 here is 177 resets cheaper than swapping at 120.
+    const late = plan({
+      class: 'Assassin',
+      current: NL_START,
+      goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 200 },
+    });
+    assertFeasible(late);
+    assertTrue(late.params.swapBurst > 0, 'the collapsed plan still bursts, at Target Level');
+    assertTrue(late.params.hpAtSwap > r.params.hpAtSwap,
+      'the later swap arrives with more HP already banked');
   });
 
   test('Swap Level == Target Level is valid and collapses everything at the goal level', () => {
@@ -1389,10 +1480,15 @@ describe('Web Worker transport', () => {
         gearInt: 40,
         mwMultiplier: 1,
       };
-      assertEq(JSON.stringify(Object.keys(payload).sort()),
-        JSON.stringify([...WORKER_PAYLOAD_KEYS].sort()), 'payload has exactly the expected keys');
       assertCloneable(payload, `payload(${className})`);
     }
+    // The literal above proves only that the literal is cloneable. Read the real builder out of
+    // index.html: adding classData there is the regression this test exists to catch.
+    const src = indexSrc.match(/function calcPayload\(input, requestId\) \{([\s\S]*?)\n    \}/);
+    assertTrue(Boolean(src), 'found calcPayload in index.html');
+    const keys = [...src[1].matchAll(/^\s{8}([A-Za-z]+)[,:]/gm)].map(m => m[1]);
+    assertEq(JSON.stringify(keys.sort()), JSON.stringify([...WORKER_PAYLOAD_KEYS].sort()),
+      'the real calcPayload sends exactly the expected keys');
   });
 
   test('The worker echoes the request ID on progress, result, and error messages', () => {
@@ -1486,6 +1582,122 @@ describe('Web Worker transport', () => {
     // The worker posts this object back verbatim.
     assertCloneable(r, 'infeasibleResult');
   });
+});
+
+describe('Per-class constants', () => {
+  // Every class reaches optimize() somewhere in this suite, but only a handful get anything past
+  // "feasible" — so a typo in, say, Bandit's staleAPHP would not fail anything. This pins the
+  // wash-relevant numbers for all eleven, straight from Nise's compilation. No search, no cost.
+  const EXPECTED = {
+    //              nHP nMP fHP sHP fMP loss  maxHP@lvl    maxMP@lvl
+    'Assassin':    [ 22, 15, 18, 16, 10, 12,  0, null,     0, null],
+    'Bandit':      [ 22, 15, 18, 16, 10, 12,  0, null,     0, null],
+    'Hunter':      [ 22, 15, 18, 16, 10, 12,  0, null,     0, null],
+    'Crossbowman': [ 22, 15, 18, 16, 10, 12,  0, null,     0, null],
+    'Gunslinger':  [ 25, 20, 18, 18, 14, 16,  0, null,     0, null],
+    'Brawler':     [ 25, 20, 38, 18, 14, 16, 30, 33,       0, null],
+    'Fighter':     [ 26,  5, 52, 20,  2,  4, 40, 16,       0, null],
+    'Spearman':    [ 26,  5, 52, 20,  2,  4, 40, 16,       0, null],
+    'Page':        [ 26,  5, 52, 20,  2,  4, 40, 16,       0, null],
+    'Magician':    [ 12, 23,  8,  6, 38, 30,  0, null,    20, 12],
+    'Beginner':    [ 14, 11, 10,  8,  6,  8,  0, null,     0, null],
+  };
+
+  test('Every class carries the expected wash constants', () => {
+    assertEq(Object.keys(EXPECTED).length, CLASS_ORDER.length, 'one expectation per class');
+    for (const className of CLASS_ORDER) {
+      const e = EXPECTED[className];
+      assertTrue(Boolean(e), `${className}: has an expectation`);
+      const c = CLASSES[className];
+      assertEq(c.naturalHPPerLevel, e[0], `${className}.naturalHPPerLevel`);
+      assertEq(c.naturalMPPerLevel, e[1], `${className}.naturalMPPerLevel`);
+      assertEq(c.freshAPHP, e[2], `${className}.freshAPHP`);
+      assertEq(c.staleAPHP, e[3], `${className}.staleAPHP`);
+      assertEq(c.freshAPMPBase, e[4], `${className}.freshAPMPBase`);
+      assertEq(c.mpLossPerReset, e[5], `${className}.mpLossPerReset`);
+      assertEq(c.maxHPBonusPerLevel, e[6], `${className}.maxHPBonusPerLevel`);
+      assertEq(c.maxHPActivatesAt, e[7], `${className}.maxHPActivatesAt`);
+      assertEq(c.maxMPBonusPerLevel, e[8], `${className}.maxMPBonusPerLevel`);
+      assertEq(c.maxMPActivatesAt, e[9], `${className}.maxMPActivatesAt`);
+      // A Fresh HP Wash must never yield LESS HP than a Stale one, or the whole fresh/stale
+      // distinction is inverted. Equality is real: a Gunslinger has no Max HP mastery, so both
+      // washes pay the same 18.
+      assertTrue(c.freshAPHP >= c.staleAPHP, `${className}: fresh AP yields at least stale HP`);
+      // A wash cycle must be MP-positive at zero INT for washing to be possible at all.
+      assertTrue(c.freshAPMPBase < c.mpLossPerReset || c.isMage,
+        `${className}: a zero-INT wash cycle is net MP-negative, as the model assumes`);
+      // maxHP/maxMP bonuses and their activation levels come as a pair.
+      assertEq(c.maxHPBonusPerLevel > 0, c.maxHPActivatesAt !== null, `${className}: maxHP pair`);
+      assertEq(c.maxMPBonusPerLevel > 0, c.maxMPActivatesAt !== null, `${className}: maxMP pair`);
+    }
+  });
+
+  test('Maple Warrior levels match the multipliers the UI offers', () => {
+    assertEq(JSON.stringify(mod.MAPLE_WARRIOR_LEVELS),
+      JSON.stringify([
+        { label: 'None', level: 0, multiplier: 1.00 },
+        { label: 'MW 10', level: 10, multiplier: 1.05 },
+        { label: 'MW 20', level: 20, multiplier: 1.10 },
+        { label: 'MW 30', level: 30, multiplier: 1.15 },
+      ]), 'the MW table is the one the tests calibrate against');
+    // The dropdown is populated from the same constant rather than a parallel literal.
+    assertTrue(/MAPLE_WARRIOR_LEVELS\.forEach/.test(indexSrc),
+      'the UI builds its Maple Warrior options from MAPLE_WARRIOR_LEVELS');
+  });
+});
+
+describe('Level-table invariants across plans', () => {
+  // Every phase label the engine can emit. Pinned because CONTEXT.md's list silently fell five
+  // labels behind the code; a new label now has to be added here (and there) deliberately.
+  const PHASES = new Set([
+    'Shift to INT', 'First Job Requirement',
+    'Build Base INT', 'Build LUK', 'Build DEX', 'Build STR', 'Build INT',
+    'MP Wash', 'MP Wash + Reset INT', 'MP Wash + Pre-Swap Fresh HP Wash',
+    'MP Wash + Fresh HP Wash + Reset INT', 'MP + Fresh + Stale HP Wash + Reset INT',
+    'Pre-Swap Fresh HP Wash', 'Fresh HP Wash', 'Fresh HP Wash + Reset INT',
+    'Stale HP Wash', 'Stale HP Wash + Reset INT',
+    'Fresh + Stale HP Wash', 'Fresh + Stale HP Wash + Reset INT',
+    'MP-Cap HP Wash', 'Reset Base INT', 'Done',
+  ]);
+
+  const cases = [
+    ['Assassin', { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 }, 40, 1.0],
+    ['Fighter', { hpGoal: 25000, mpGoal: 2000, targetLevel: 140, swapLevel: 130 }, 40, 1.0],
+    ['Magician', { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, 40, 1.0],
+    ['Brawler', { hpGoal: 20000, mpGoal: 4000, targetLevel: 120, swapLevel: 110 }, 0, 1.0],
+  ];
+
+  for (const [className, goals, gearInt, mwMultiplier] of cases) {
+    test(`${className} plan: every level respects the caps, the floors and the phase vocabulary`, () => {
+      const r = plan({ class: className, goals, gearInt, mwMultiplier });
+      assertFeasible(r);
+      const rows = levelTable(CLASSES[className], r.__state, r.__goals, gearInt, mwMultiplier, r);
+      const secondJALevel = 30;
+      for (const row of rows) {
+        // Phase vocabulary, allowing the composite first-job prefix.
+        const bare = row.phase.replace(/^[A-Z]+ for 1st Job \+ /, '');
+        assertTrue(PHASES.has(bare), `lvl ${row.level}: unknown phase "${row.phase}"`);
+        // Level-end values are hard-capped, always.
+        assertTrue(row.hp <= 30000, `lvl ${row.level}: HP ${row.hp} over the 30k cap`);
+        assertTrue(row.mp <= 30000, `lvl ${row.level}: MP ${row.mp} over the 30k cap`);
+        // The transient peak is capped too, EXCEPT in a cap-wash phase whose MP goal is itself
+        // 30,000: the model levels first and washes the excess down afterwards, where a player
+        // would wash down first and then level. Same MP generated, same washes, different order —
+        // so the peak reads a little over the cap. Bounded here at one level's worth of generation
+        // (measured max 717 across the Mage plans) so a real modelling runaway still fails.
+        const peakCap = r.params.capWash ? 31500 : 30000;
+        assertTrue(row.peakMPThisLevel <= peakCap,
+          `lvl ${row.level}: transient MP peak ${row.peakMPThisLevel} over ${peakCap}`);
+        // Minimum MP is a post-2nd-job floor and only a reset can push MP down.
+        if (row.level >= secondJALevel && row.mpResetsThisLevel > 0) {
+          const floor = mod.minMPAtLevel(CLASSES[className], row.level);
+          assertTrue(row.mp >= floor, `lvl ${row.level}: MP ${row.mp} below Min MP ${floor}`);
+        }
+        assertTrue(row.hpMPPoolValid, `lvl ${row.level}: stale wash with an unseeded HP/MP Pool`);
+      }
+      assertEq(rows.at(-1).cumulativeResets, r.apResets, 'the table schedules every reset');
+    });
+  }
 });
 
 // ────────────────────────── exit ──────────────────────────
