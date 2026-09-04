@@ -140,24 +140,24 @@ function plan(opts) {
 // Calibrated against Krythan's published sheet defaults.
 
 describe('Reference cases (Krythan-aligned)', () => {
-  test('Night Lord fresh start to 30k HP / 5k MP at lvl 180', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 } });
+  test('Assassin fresh start to 30k HP / 5k MP at lvl 180', () => {
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 } });
     assertFeasible(r);
     assertEq(r.finalHP, 30000, 'HP at cap');
     assertTrue(r.finalMP >= 5000, 'MP meets goal');
     // Krythan's NL sheet defaults give ~2121 AP Resets; tightened from 1900-2500.
     assertInRange(r.apResets, 2000, 2400, 'AP Resets within ±10% of Krythan default ~2121');
     assertInRange(r.params.targetBaseInt, 300, 600, 'Target Base INT in Krythan-style range');
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     assertEq(rows.find(row => row.level === 10).firstJobStatValue, 25,
       'the level schedule reaches the permanent 25 DEX thief requirement');
-    assertTrue(phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r)
+    assertTrue(phasePlan(CLASSES['Assassin'], r.__state, r.__goals, r)
       .some(phase => phase.phase === 'First Job Requirement' && /25 DEX/.test(phase.action)),
     'the phase plan tells the user about the thief requirement');
   });
 
-  test('Hero (Warrior) fresh start to 30k HP / 2k MP at lvl 180', () => {
-    const r = plan({ class: 'Hero', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 } });
+  test('Fighter (Warrior) fresh start to 30k HP / 2k MP at lvl 180', () => {
+    const r = plan({ class: 'Fighter', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 } });
     assertFeasible(r);
     assertEq(r.finalHP, 30000);
     assertTrue(r.finalMP >= 2000);
@@ -189,7 +189,7 @@ describe('Reference cases (Krythan-aligned)', () => {
 
 describe('Maple Warrior multiplier', () => {
   const baseInputs = {
-    class: 'Night Lord',
+    class: 'Assassin',
     goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
   };
   test('MW30 plan uses no more AP Resets than MW0', () => {
@@ -212,9 +212,9 @@ describe('Maple Warrior multiplier', () => {
 
 describe('Mid-progress shift mechanic', () => {
   test('Mid-progress with low INT and high Main Stat picks a positive shift when beneficial', () => {
-    // Lvl 100 Night Lord with LUK 400 but only 4 Base INT — should convert some LUK→INT.
+    // Lvl 100 Assassin with LUK 400 but only 4 Base INT — should convert some LUK→INT.
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { level: 100, hp: 4000, mp: 1500, baseInt: 4, mainStat: 400 },
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
     });
@@ -226,7 +226,7 @@ describe('Mid-progress shift mechanic', () => {
     // Keeping the 110 Base INT supplies enough natural INT-based MP to meet the goal, so the
     // optimizer can skip MP Washing and use a short pre-Swap Fresh HP Wash suffix instead.
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 40, hp: 1500, mp: 800, baseInt: 110, mainStat: 4 },
       goals: { hpGoal: 12000, mpGoal: 3000, targetLevel: 180, swapLevel: 160 },
     });
@@ -238,17 +238,17 @@ describe('Mid-progress shift mechanic', () => {
     assertEq(r.breakdown.phase3Fresh, 25, 'five pre-Swap levels supply the remaining HP');
     assertEq(r.breakdown.staleHPWash, 0, 'fresh washes remove the stale-wash cleanup');
     assertEq(r.apResets, 131, 'only INT reset and pre-Swap Fresh HP Wash resets are needed');
-    const phases = phasePlan(CLASSES['Hero'], r.__state, r.__goals, r);
+    const phases = phasePlan(CLASSES['Fighter'], r.__state, r.__goals, r);
     assertTrue(phases.some(p => p.phase === 'Pre-Swap Fresh HP Wash' && /Keep Base INT/.test(p.action)),
       'phase plan should retain INT through the pre-Swap Fresh HP Wash');
-    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r);
     const beforeSwap = rows.find(row => row.level === 159);
     assertEq(beforeSwap.baseInt, 110, 'Base INT remains available for level-up MP gain');
     assertTrue(beforeSwap.mainStat > 4, 'paired AP Resets build STR before the swap');
   });
   test('Joint INT and fresh-wash search includes Target Base INT gain thresholds', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 100, hp: 4000, mp: 1500, baseInt: 4, mainStat: 1000 },
       goals: { hpGoal: 25000, mpGoal: 2000, targetLevel: 180, swapLevel: 120 },
     });
@@ -258,7 +258,7 @@ describe('Mid-progress shift mechanic', () => {
   });
   test('Shift-to-INT search includes distant Base INT gain thresholds', () => {
     const r = plan({
-      class: 'Buccaneer',
+      class: 'Brawler',
       current: { level: 100, hp: 4000, mp: 1500, baseInt: 4, luk: 1000 },
       goals: { hpGoal: 20000, mpGoal: 4000, targetLevel: 180, swapLevel: 120 },
     });
@@ -270,14 +270,14 @@ describe('Mid-progress shift mechanic', () => {
 
 describe('Engine invariants', () => {
   test('Total AP Resets equals sum of breakdown parts', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
     const b = r.breakdown;
     const sum = b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash;
     assertEq(r.apResets, sum, `apResets ${r.apResets} != sum ${sum}`);
   });
-  test('Invariant holds for Hero (Warrior-style plan with fresh HP wash dominant)', () => {
-    const r = plan({ class: 'Hero', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180 } });
+  test('Invariant holds for Fighter (Warrior-style plan with fresh HP wash dominant)', () => {
+    const r = plan({ class: 'Fighter', goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180 } });
     assertFeasible(r);
     const b = r.breakdown;
     assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash);
@@ -289,7 +289,7 @@ describe('Engine invariants', () => {
     assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash);
   });
   test('mpWashStart ≤ mpWashEnd ≤ mpWashStop ≤ targetLevel always', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
     assertTrue(r.params.mpWashStart <= r.params.mpWashStop, 'mpWashStart ≤ mpWashStop');
     assertTrue((r.params.mpWashEnd ?? r.params.mpWashStop) >= r.params.mpWashStart,
@@ -300,7 +300,7 @@ describe('Engine invariants', () => {
   });
   test('Feasible plan with zero Gear INT', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
       gearInt: 0,
     });
@@ -312,15 +312,15 @@ describe('Engine invariants', () => {
 
 describe('Unit tests for helpers', () => {
   test('minMPAtLevel matches Nise per class', () => {
-    assertEq(mod.minMPAtLevel(CLASSES['Night Lord'], 180), 14 * 180 + 135);
-    assertEq(mod.minMPAtLevel(CLASSES['Hero'], 180), 4 * 180 + 55);
+    assertEq(mod.minMPAtLevel(CLASSES['Assassin'], 180), 14 * 180 + 135);
+    assertEq(mod.minMPAtLevel(CLASSES['Fighter'], 180), 4 * 180 + 55);
     assertEq(mod.minMPAtLevel(CLASSES['Magician'], 180), 22 * 180 + 449);
     assertEq(mod.minMPAtLevel(CLASSES['Beginner'], 100), 10 * 100 - 5);
   });
   test('minHPAtLevel matches Nise per class', () => {
-    assertEq(mod.minHPAtLevel(CLASSES['Night Lord'], 180), 20 * 180 + 378);
-    assertEq(mod.minHPAtLevel(CLASSES['Hero'], 180), 24 * 180 + 472);
-    assertEq(mod.minHPAtLevel(CLASSES['Dark Knight'], 180), 24 * 180 + 172);
+    assertEq(mod.minHPAtLevel(CLASSES['Assassin'], 180), 20 * 180 + 378);
+    assertEq(mod.minHPAtLevel(CLASSES['Fighter'], 180), 24 * 180 + 472);
+    assertEq(mod.minHPAtLevel(CLASSES['Spearman'], 180), 24 * 180 + 172);
     assertEq(mod.minHPAtLevel(CLASSES['Magician'], 180), 10 * 180 + 64);
     assertEq(mod.minHPAtLevel(CLASSES['Beginner'], 100), 12 * 100 + 50);
   });
@@ -334,10 +334,10 @@ describe('Unit tests for helpers', () => {
   });
 
   test('3rd and 4th job advancements grant five extra allocatable AP', () => {
-    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 69), 5, 'ordinary level');
-    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 70), 10, '3rd job advancement');
-    assertEq(mod.freshAPAtLevel(CLASSES['Hero'], 120), 10, '4th job advancement');
-    assertEq(mod.freshAPInRange(CLASSES['Hero'], 69, 120), 265,
+    assertEq(mod.freshAPAtLevel(CLASSES['Fighter'], 69), 5, 'ordinary level');
+    assertEq(mod.freshAPAtLevel(CLASSES['Fighter'], 70), 10, '3rd job advancement');
+    assertEq(mod.freshAPAtLevel(CLASSES['Fighter'], 120), 10, '4th job advancement');
+    assertEq(mod.freshAPInRange(CLASSES['Fighter'], 69, 120), 265,
       'range includes both five-AP advancement awards');
     assertEq(mod.freshAPInRange(CLASSES['Beginner'], 69, 120), 255,
       'Beginners do not receive job-advancement AP');
@@ -345,11 +345,11 @@ describe('Unit tests for helpers', () => {
 
   test('Every first-job family has the MapleLegends level and permanent stat requirement', () => {
     const expected = {
-      'Night Lord': [10, 'DEX', 25], 'Shadower': [10, 'DEX', 25],
-      'Bowmaster': [10, 'DEX', 25], 'Marksman': [10, 'DEX', 25],
-      'Corsair': [10, 'DEX', 20], 'Buccaneer': [10, 'DEX', 20],
-      'Hero': [10, 'STR', 35], 'Dark Knight': [10, 'STR', 35],
-      'Paladin': [10, 'STR', 35], 'Magician': [8, 'INT', 20],
+      'Assassin': [10, 'DEX', 25], 'Bandit': [10, 'DEX', 25],
+      'Hunter': [10, 'DEX', 25], 'Crossbowman': [10, 'DEX', 25],
+      'Gunslinger': [10, 'DEX', 20], 'Brawler': [10, 'DEX', 20],
+      'Fighter': [10, 'STR', 35], 'Spearman': [10, 'STR', 35],
+      'Page': [10, 'STR', 35], 'Magician': [8, 'INT', 20],
     };
     for (const [className, values] of Object.entries(expected)) {
       const requirement = CLASSES[className].firstJobRequirement;
@@ -363,10 +363,10 @@ describe('Unit tests for helpers', () => {
   test('Required non-INT AP is reserved before washing while required Mage INT remains useful', () => {
     const fresh = { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 13 };
     const cases = [
-      ['Night Lord', 21, 24],
-      ['Bowmaster', 21, 24],
-      ['Buccaneer', 16, 29],
-      ['Hero', 31, 14],
+      ['Assassin', 21, 24],
+      ['Hunter', 21, 24],
+      ['Brawler', 16, 29],
+      ['Fighter', 31, 14],
     ];
     for (const [className, requiredAP, usableThroughAdvancement] of cases) {
       const cls = CLASSES[className];
@@ -386,10 +386,10 @@ describe('Unit tests for helpers', () => {
 
   test('An advanced character below its permanent first-job stat floor is rejected', () => {
     const cases = [
-      ['Night Lord', { dex: 24 }, 'DEX cannot be below 25'],
-      ['Bowmaster', { dex: 24 }, 'DEX cannot be below 25'],
-      ['Buccaneer', { dex: 19 }, 'DEX cannot be below 20'],
-      ['Hero', { str: 34 }, 'STR cannot be below 35'],
+      ['Assassin', { dex: 24 }, 'DEX cannot be below 25'],
+      ['Hunter', { dex: 24 }, 'DEX cannot be below 25'],
+      ['Brawler', { dex: 19 }, 'DEX cannot be below 20'],
+      ['Fighter', { str: 34 }, 'STR cannot be below 35'],
       ['Magician', { baseInt: 19 }, 'INT cannot be below 20'],
     ];
     for (const [className, stat, reason] of cases) {
@@ -406,10 +406,10 @@ describe('Unit tests for helpers', () => {
 });
 
 describe('phasePlan output shape', () => {
-  test('Night Lord plan emits Build Base INT → MP Wash → Stale HP Wash → Reset Base INT', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+  test('Assassin plan emits Build Base INT → MP Wash → Stale HP Wash → Reset Base INT', () => {
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const phases = phasePlan(r.params && CLASSES[r.params.className || 'Night Lord'] || CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, r);
+    const phases = phasePlan(r.params && CLASSES[r.params.className || 'Assassin'] || CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, r);
     const phaseNames = phases.map(p => p.phase);
     assertTrue(phaseNames.includes('Build Base INT'), 'has Build Base INT phase');
     assertTrue(phaseNames.includes('MP Wash'), 'has MP Wash phase');
@@ -440,41 +440,41 @@ describe('phasePlan output shape', () => {
 
 describe('levelTable output', () => {
   test('Has one row per level from current to target inclusive', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
     assertEq(rows.length, 180, '180 rows for levels 1-180');
     assertEq(rows[0].level, 1);
     assertEq(rows[rows.length - 1].level, 180);
   });
   test('Cumulative AP Resets monotone non-decreasing', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
     for (let i = 1; i < rows.length; i++) {
       assertTrue(rows[i].cumulativeResets >= rows[i-1].cumulativeResets, `non-decreasing at row ${i}`);
     }
   });
   test('HP is monotone non-decreasing across levels', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
     for (let i = 1; i < rows.length; i++) {
       assertTrue(rows[i].hp >= rows[i-1].hp, `HP non-decreasing at row ${i}`);
     }
   });
   test('Final-row HP matches the summary finalHP exactly (analytical and per-level paths unified)', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
     const lastRow = rows[rows.length - 1];
     // Both code paths now go through the same per-level math — no tolerance needed.
     assertEq(lastRow.hp, r.finalHP, `last row HP ${lastRow.hp} vs summary ${r.finalHP}`);
   });
   test('Final-row MP matches the summary finalMP exactly', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], { level: 1, hp: 50, mp: 5, baseInt: 4, mainStat: 4 }, { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 }, 40, 1.0, r);
     const lastRow = rows[rows.length - 1];
     assertEq(lastRow.mp, r.finalMP, `last row MP ${lastRow.mp} vs summary ${r.finalMP}`);
   });
@@ -482,7 +482,7 @@ describe('levelTable output', () => {
 
 describe('Optimizer determinism', () => {
   test('Same inputs yield identical results on re-run', () => {
-    const inputs = { class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } };
+    const inputs = { class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } };
     const r1 = plan(inputs);
     const r2 = plan(inputs);
     assertEq(r1.apResets, r2.apResets);
@@ -496,7 +496,7 @@ describe('Optimizer determinism', () => {
 
 describe('Boundary cases', () => {
   test('Final HP equals exactly 30,000 when HP Goal is 30k (cap saturates)', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     assertFeasible(r);
     assertEq(r.finalHP, 30000, 'finalHP must equal the cap');
   });
@@ -510,21 +510,21 @@ describe('Boundary cases', () => {
 
   test('MP Goal exactly at Min MP is feasible', () => {
     // Min MP for NL at lvl 180 = 14*180 + 135 = 2655.
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 5000, mpGoal: 2655, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 5000, mpGoal: 2655, targetLevel: 180 } });
     assertFeasible(r);
     assertTrue(r.finalMP >= 2655);
   });
 
   test('Current Level == Target Level is infeasible', () => {
-    const r = plan({ class: 'Night Lord', current: { level: 135, hp: 10000, mp: 2000 }, goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 135 } });
+    const r = plan({ class: 'Assassin', current: { level: 135, hp: 10000, mp: 2000 }, goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 135 } });
     assertInfeasible(r, 'target level');
   });
 
   test('Mid-progress current state typically costs less than a fresh start', () => {
     // Mid-progress at lvl 100 with some existing HP/MP/INT should be ≤ fresh-start cost.
-    const fresh = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
+    const fresh = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 } });
     const mid = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { level: 100, hp: 5000, mp: 3000, baseInt: 200, mainStat: 300 },
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
     });
@@ -543,14 +543,14 @@ describe('Infeasibility detection', () => {
   });
 
   test('MP Goal below class Min MP is infeasible with explicit reason', () => {
-    // Buccaneer Min MP at lvl 180 = 18*180 + 95 = 3335.
-    const r = plan({ class: 'Buccaneer', goals: { hpGoal: 30000, mpGoal: 1000, targetLevel: 180 } });
+    // Brawler Min MP at lvl 180 = 18*180 + 95 = 3335.
+    const r = plan({ class: 'Brawler', goals: { hpGoal: 30000, mpGoal: 1000, targetLevel: 180 } });
     assertInfeasible(r, 'minimum possible MP');
   });
 
   test('Target Level less than Current Level is infeasible', () => {
     const r = plan({
-      class: 'Bowmaster',
+      class: 'Hunter',
       current: { level: 100 },
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 80 },
     });
@@ -558,7 +558,7 @@ describe('Infeasibility detection', () => {
   });
 
   test('HP Goal > 30,000 is rejected upfront', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 35000, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 35000, mpGoal: 5000, targetLevel: 180 } });
     assertInfeasible(r, '30,000 HP cap');
   });
 
@@ -568,22 +568,22 @@ describe('Infeasibility detection', () => {
   });
 
   test('Negative HP Goal is rejected', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: -1, mpGoal: 5000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: -1, mpGoal: 5000, targetLevel: 180 } });
     assertInfeasible(r, '≥ 0');
   });
 
   test('Negative MP Goal is rejected', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 30000, mpGoal: -1, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 30000, mpGoal: -1, targetLevel: 180 } });
     assertInfeasible(r, '≥ 0');
   });
 
   test('Out-of-range Current Level is rejected', () => {
-    const r = plan({ class: 'Night Lord', current: { level: 0 }, goals: { hpGoal: 5000, mpGoal: 3000, targetLevel: 180 } });
+    const r = plan({ class: 'Assassin', current: { level: 0 }, goals: { hpGoal: 5000, mpGoal: 3000, targetLevel: 180 } });
     assertInfeasible(r, 'Current Level');
   });
 
   test('Out-of-range Target Level is rejected', () => {
-    const r = plan({ class: 'Night Lord', goals: { hpGoal: 5000, mpGoal: 3000, targetLevel: 250 } });
+    const r = plan({ class: 'Assassin', goals: { hpGoal: 5000, mpGoal: 3000, targetLevel: 250 } });
     assertInfeasible(r, 'Target Level');
   });
 
@@ -601,20 +601,20 @@ describe('Infeasibility detection', () => {
 describe('Wash-math primitives', () => {
   test('washCycleMP for NL at INT 200 = 28 - 12 = 8 MP per cycle', () => {
     // NL: freshAPMPBase=10, mpLossPerReset=12 → deficit=2. floor(200/10) - 2 = 18.
-    assertEq(mod.washCycleMP(CLASSES['Night Lord'], 200), 18);
+    assertEq(mod.washCycleMP(CLASSES['Assassin'], 200), 18);
   });
   test('washCycleMP for Mage at INT 300 = floor(30) + 8 = 38', () => {
     // Mage: freshAPMPBase=38, mpLossPerReset=30 → deficit=-8. floor(300/10) - (-8) = 38.
     assertEq(mod.washCycleMP(CLASSES['Magician'], 300), 38);
   });
-  test('freshHPWashYield for Hero (52 HP per fresh AP) × 10 = 520', () => {
-    assertEq(mod.freshHPWashYield(CLASSES['Hero'], 10), 520);
+  test('freshHPWashYield for Fighter (52 HP per fresh AP) × 10 = 520', () => {
+    assertEq(mod.freshHPWashYield(CLASSES['Fighter'], 10), 520);
   });
   test('staleHPWashYield for Mage (6 HP per reset) × 100 = 600', () => {
     assertEq(mod.staleHPWashYield(CLASSES['Magician'], 100), 600);
   });
   test('washCycleMPCost for NL (12 MP per reset) × 50 = 600', () => {
-    assertEq(mod.washCycleMPCost(CLASSES['Night Lord'], 50), 600);
+    assertEq(mod.washCycleMPCost(CLASSES['Assassin'], 50), 600);
   });
 });
 
@@ -624,7 +624,7 @@ describe('Phase steps in isolation', () => {
   test('runPhase1 builds INT from currentBaseInt+shift to phase1EndInt over fresh AP', () => {
     const cur = { level: 4, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const params = { mpWashStart: 14, shift: 0, targetBaseInt: 100 };  // 10 levels of Phase 1
-    const p1 = mod.runPhase1(CLASSES['Night Lord'], cur, params, 0, 1.0);
+    const p1 = mod.runPhase1(CLASSES['Assassin'], cur, params, 0, 1.0);
     // Of the 50 fresh AP, 21 must first raise DEX from 4 to the permanent thief floor of 25.
     // The remaining 29 build INT: 4 + 29 = 33.
     assertEq(p1.startBaseInt, 4);
@@ -634,8 +634,8 @@ describe('Phase steps in isolation', () => {
   test('runPhase2 includes the extra advancement AP at levels 70 and 120', () => {
     const params = { mpWashStart: 60, mpWashStop: 145, targetBaseInt: 300 };
     const phase1 = { phase1EndInt: 300 };  // already at target, plateau-only Phase 2
-    const p2 = mod.runPhase2(CLASSES['Night Lord'], params, phase1, 40, 1.0);
-    assertEq(p2.phase2APResets, mod.freshAPInRange(CLASSES['Night Lord'], 60, 145));
+    const p2 = mod.runPhase2(CLASSES['Assassin'], params, phase1, 40, 1.0);
+    assertEq(p2.phase2APResets, mod.freshAPInRange(CLASSES['Assassin'], 60, 145));
     assertEq(p2.intResetsInPhase2, 0, 'INT already at target');
     assertEq(p2.phase2PlateauLevels, 145 - 60, 'all Phase 2 is plateau');
   });
@@ -654,7 +654,7 @@ describe('Phase steps in isolation', () => {
   test('runPhase3 with both fresh and stale wash combines yields', () => {
     const params = { mpWashStop: 145, targetBaseInt: 300, phase3FreshHPResets: 105, staleHPPerLevelPhase3: 2 };
     const goals = { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 };
-    const p3 = mod.runPhase3(CLASSES['Night Lord'], params, goals, 40, 1.0);
+    const p3 = mod.runPhase3(CLASSES['Assassin'], params, goals, 40, 1.0);
     assertEq(p3.phase3FreshHPResets, 35 * 3);  // 35 levels × 3 fresh per level
     assertEq(p3.phase3StaleHPResets, 35 * 2);  // 35 levels × 2 stale per level
     // NL freshAPHP=18, staleAPHP=16. Fresh yield = 105*18 = 1890. Stale yield = 70*16 = 1120.
@@ -667,7 +667,7 @@ describe('Phase steps in isolation', () => {
     assertEq(mageCleanup.intResetAPResets, 0, 'Mage skips INT reset');
     // HP gap 3000 / staleAPHP 6 = 500 stale resets
     assertEq(mageCleanup.cleanupStaleHPWash, 500);
-    const nlCleanup = mod.runCleanup(CLASSES['Night Lord'], 2000, 10000, goals, 300);
+    const nlCleanup = mod.runCleanup(CLASSES['Assassin'], 2000, 10000, goals, 300);
     assertEq(nlCleanup.intResetAPResets, 300 - 4, 'NL resets INT back to 4');
   });
 });
@@ -678,7 +678,7 @@ describe('prepareInputs clamps Goals only (not Current HP/MP)', () => {
   test('HP Goal below Min HP at target is clamped to the floor with a note', () => {
     const cur = { level: 100, hp: 5000, mp: 2000, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const goals = { hpGoal: 100, mpGoal: 5000, targetLevel: 180 };
-    const notes = prepareInputs(CLASSES['Night Lord'], cur, goals, 'Night Lord');
+    const notes = prepareInputs(CLASSES['Assassin'], cur, goals, 'Assassin');
     // NL Min HP at lvl 180 = 20*180 + 378 = 3978
     assertEq(goals.hpGoal, 3978, 'HP Goal clamped to Min HP at target');
     const note = notes.find(n => n.fieldId === 'i-hp-goal');
@@ -689,7 +689,7 @@ describe('prepareInputs clamps Goals only (not Current HP/MP)', () => {
   test('MP Goal below Min MP at target is clamped to the floor with a note', () => {
     const cur = { level: 100, hp: 5000, mp: 2000, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const goals = { hpGoal: 30000, mpGoal: 100, targetLevel: 180 };
-    const notes = prepareInputs(CLASSES['Night Lord'], cur, goals, 'Night Lord');
+    const notes = prepareInputs(CLASSES['Assassin'], cur, goals, 'Assassin');
     // NL Min MP at lvl 180 = 14*180 + 135 = 2655
     assertEq(goals.mpGoal, 2655, 'MP Goal clamped to Min MP at target');
     const note = notes.find(n => n.fieldId === 'i-mp-goal');
@@ -701,7 +701,7 @@ describe('prepareInputs clamps Goals only (not Current HP/MP)', () => {
     // These values must pass through untouched — pre-advancement state is real.
     const cur = { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const goals = { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 };
-    const notes = prepareInputs(CLASSES['Night Lord'], cur, goals, 'Night Lord');
+    const notes = prepareInputs(CLASSES['Assassin'], cur, goals, 'Assassin');
     assertEq(cur.hp, 50, 'Current HP unchanged');
     assertEq(cur.mp, 5, 'Current MP unchanged');
     assertTrue(!notes.find(n => n.fieldId === 'i-cur-hp'), 'no Current HP note');
@@ -710,7 +710,7 @@ describe('prepareInputs clamps Goals only (not Current HP/MP)', () => {
   test('Above-Min values are not clamped and produce no notes', () => {
     const cur = { level: 100, hp: 5000, mp: 2000, str: 4, dex: 4, luk: 4, baseInt: 4 };
     const goals = { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 };
-    const notes = prepareInputs(CLASSES['Night Lord'], cur, goals, 'Night Lord');
+    const notes = prepareInputs(CLASSES['Assassin'], cur, goals, 'Assassin');
     assertEq(notes.length, 0, 'no notes');
   });
 });
@@ -777,7 +777,7 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
 describe('Phase 3 stale-wash and peak MP cap', () => {
   test('Optimizer can stop MP Washing early and Fresh HP Wash before the Swap Level', () => {
     const r = plan({
-      class: 'Dark Knight',
+      class: 'Spearman',
       current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
     });
@@ -786,7 +786,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     assertTrue(r.params.mpWashEnd < r.params.mpWashStop, 'MP Wash ends before the swap');
     assertTrue(r.apResets < 708, 'pre-Swap fresh washes improve on the post-Swap-only plan');
 
-    const rows = levelTable(CLASSES['Dark Knight'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Spearman'], r.__state, r.__goals, 40, 1.0, r);
     const firstPreSwap = rows.find(row => row.level > r.params.mpWashEnd && row.level <= 135);
     assertEq(firstPreSwap.phase, 'Pre-Swap Fresh HP Wash', 'Fresh HP Wash follows the MP Wash phase');
     assertEq(firstPreSwap.freshHPWashesThisLevel, 5, 'all five fresh AP go to HP');
@@ -797,7 +797,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Fresh HP Wash breakdown includes both pre- and post-Swap washes', () => {
     const r = plan({
-      class: 'Dark Knight',
+      class: 'Spearman',
       current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
     });
@@ -805,14 +805,14 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     assertEq(r.breakdown.phase3Fresh,
       r.params.preSwapFreshHPResets + r.params.phase3FreshHPResets,
       'summary counts every Fresh HP Wash');
-    const phases = phasePlan(CLASSES['Dark Knight'], r.__state, r.__goals, r);
+    const phases = phasePlan(CLASSES['Spearman'], r.__state, r.__goals, r);
     assertTrue(phases.some(p => p.phase === 'Pre-Swap Fresh HP Wash'),
       'Phase Plan names the pre-Swap phase');
   });
 
-  test('Dark Knight reference plan uses the exact pre-Swap Fresh HP Wash count', () => {
+  test('Spearman reference plan uses the exact pre-Swap Fresh HP Wash count', () => {
     const r = plan({
-      class: 'Dark Knight',
+      class: 'Spearman',
       current: { level: 40, hp: 1000, mp: 300, str: 4, dex: 4, luk: 4, baseInt: 200 },
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
     });
@@ -822,7 +822,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     assertEq(r.breakdown.phase3Fresh, 355, '71 levels of fresh AP are washed into HP');
     assertEq(r.breakdown.staleHPWash, 0, 'fresh washes remove the need for stale washes');
 
-    const rows = levelTable(CLASSES['Dark Knight'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Spearman'], r.__state, r.__goals, 40, 1.0, r);
     const transition = rows.find(x => x.level === 70);
     assertEq(transition.phase, 'MP Wash + Pre-Swap Fresh HP Wash',
       'level 70 is the mixed transition level');
@@ -831,7 +831,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     for (let level = 71; level <= 134; level++) {
       const row = rows.find(x => x.level === level);
       assertEq(row.phase, 'Pre-Swap Fresh HP Wash', `lvl ${level} uses pre-Swap Fresh HP Wash`);
-      assertEq(row.freshHPWashesThisLevel, mod.freshAPAtLevel(CLASSES['Dark Knight'], level),
+      assertEq(row.freshHPWashesThisLevel, mod.freshAPAtLevel(CLASSES['Spearman'], level),
         `lvl ${level} uses every available fresh AP`);
     }
     assertEq(rows.find(x => x.level === 135).freshHPWashesThisLevel, 5,
@@ -842,15 +842,15 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Fresh HP Washes wait when frontloading would cross Minimum MP', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { baseInt: 13 },
       goals: { hpGoal: 8000, mpGoal: 2655, targetLevel: 180, swapLevel: 40 },
     });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     for (const row of rows) {
       if (row.resetsThisLevel > 0 && row.level >= 30) {
-        assertTrue(row.mp >= mod.minMPAtLevel(CLASSES['Night Lord'], row.level),
+        assertTrue(row.mp >= mod.minMPAtLevel(CLASSES['Assassin'], row.level),
           `lvl ${row.level} MP ${row.mp} stays above Minimum MP`);
       }
     }
@@ -866,7 +866,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Fresh-wash candidates include the count needed to absorb the MP cap', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 160, hp: 10000, mp: 29980 },
       goals: { hpGoal: 12100, mpGoal: 29000, targetLevel: 180, swapLevel: 160 },
     });
@@ -877,24 +877,24 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('HP at Swap Level is clamped to 30,000', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 160, hp: 29900, mp: 10000 },
       goals: { hpGoal: 30000, mpGoal: 1000, targetLevel: 180, swapLevel: 170 },
     });
     assertFeasible(r);
     assertEq(r.params.hpAtSwap, 30000, 'summary HP is capped');
-    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r);
     assertEq(rows.find(x => x.level === 170).hp, 30000, 'table HP matches summary at swap');
   });
 
   test('Partial fresh-wash levels allocate remaining AP to Main Stat in the Phase Plan', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { baseInt: 13 },
       goals: { hpGoal: 8000, mpGoal: 2655, targetLevel: 180, swapLevel: 40 },
     });
     assertFeasible(r);
-    const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
+    const phases = phasePlan(CLASSES['Assassin'], r.__state, r.__goals, r);
     const partial = phases.find(p => p.range === 'Lvl 72');
     assertTrue(Boolean(partial), 'partial wash level appears in Phase Plan');
     assertTrue(/4 remaining fresh AP per level → LUK/.test(partial.action),
@@ -921,10 +921,10 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
       const goals = className === 'Magician' ? { hpGoal: 5000, mpGoal: 10000, targetLevel: 180 }
                   : className === 'Beginner' ? { hpGoal: 5000, mpGoal: 2000, targetLevel: 180 }
                   : { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 };
-      if (className === 'Hero' || className === 'Dark Knight' || className === 'Paladin') {
+      if (className === 'Fighter' || className === 'Spearman' || className === 'Page') {
         goals.mpGoal = 2000;
       }
-      if (className === 'Buccaneer') goals.mpGoal = 4000;
+      if (className === 'Brawler') goals.mpGoal = 4000;
       const r = plan({ class: className, goals });
       assertFeasible(r);
       assertTrue(typeof r.params.mpEndPhase2 === 'number', `${className}: mpEndPhase2 present in params`);
@@ -934,7 +934,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Intermediate pre-Swap MP cap violations are rejected', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 160, hp: 22500, mp: 29400, baseInt: 500 },
       goals: { hpGoal: 30000, mpGoal: 29900, targetLevel: 180, swapLevel: 180 },
     });
@@ -943,7 +943,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Stale-heavy plans search the exact MP Wash end needed for the MP Goal', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { level: 169, hp: 7324, mp: 8585, baseInt: 504 },
       goals: { hpGoal: 16257, mpGoal: 9208, targetLevel: 200, swapLevel: 197 },
     });
@@ -954,7 +954,7 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
 
   test('Stale HP Wash breakdown lumps Phase 3 stale + swap burst + cleanup stale into one count', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 },
     });
     assertFeasible(r);
@@ -994,10 +994,10 @@ describe('4-stat shift budget', () => {
     assertTrue(r.breakdown.shift >= 0, 'shift count is non-negative');
   });
 
-  test('Optimizer can shift from a non-MainStat stat (e.g., DEX on a Night Lord)', () => {
+  test('Optimizer can shift from a non-MainStat stat (e.g., DEX on a Assassin)', () => {
     // NL whose extras sit in DEX (not LUK). Only the amount above permanent 25 DEX is eligible.
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: { level: 100, hp: 4000, mp: 1500, str: 4, dex: 400, luk: 4, baseInt: 4 },
       goals: { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 },
     });
@@ -1025,15 +1025,15 @@ describe('4-stat shift budget', () => {
 
 describe('Per-class smoke tests (every class returns a sensible plan)', () => {
   const sensibleGoals = {
-    'Night Lord':  { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
-    'Shadower':    { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
-    'Bowmaster':   { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
-    'Marksman':    { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
-    'Corsair':     { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
-    'Buccaneer':   { hpGoal: 30000, mpGoal: 4000,  targetLevel: 180 },
-    'Hero':        { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
-    'Dark Knight': { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
-    'Paladin':     { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
+    'Assassin':  { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
+    'Bandit':    { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
+    'Hunter':   { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
+    'Crossbowman':    { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
+    'Gunslinger':     { hpGoal: 30000, mpGoal: 5000,  targetLevel: 180 },
+    'Brawler':   { hpGoal: 30000, mpGoal: 4000,  targetLevel: 180 },
+    'Fighter':        { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
+    'Spearman': { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
+    'Page':     { hpGoal: 30000, mpGoal: 2000,  targetLevel: 180 },
     'Magician':    { hpGoal: 5000,  mpGoal: 10000, targetLevel: 180 },
     'Beginner':    { hpGoal: 5000,  mpGoal: 2000,  targetLevel: 180 },  // Beginner Min MP at 180 = 1795
   };
@@ -1058,12 +1058,12 @@ describe('Swap Level', () => {
 
   test('Base INT collapses to its starting value AT the Swap Level, not at Target Level', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
     });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     const preSwap = rows.find(x => x.level === 119);
     const atSwap = rows.find(x => x.level === 120);
     assertTrue(preSwap.baseInt > 4, 'Base INT is built up before the swap');
@@ -1072,12 +1072,12 @@ describe('Swap Level', () => {
 
   test('Main Stat absorbs Base INT at the Swap Level', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
     });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     const preSwap = rows.find(x => x.level === 119);
     const atSwap = rows.find(x => x.level === 120);
     assertTrue(atSwap.mainStat > preSwap.mainStat, 'Main Stat jumps at the swap');
@@ -1088,19 +1088,19 @@ describe('Swap Level', () => {
 
   test('Level table carries a Main Stat column', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
     });
     assertFeasible(r);
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     assertTrue('mainStat' in rows[0], 'rows carry a mainStat field');
     assertTrue(rows.every(x => Number.isFinite(x.mainStat)), 'mainStat is always numeric');
   });
 
   test('Swap burst front-loads HP at the swap level (free — total resets unchanged)', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 120 },
     });
@@ -1111,14 +1111,14 @@ describe('Swap Level', () => {
 
   test('Swap Level == Target Level is valid and collapses everything at the goal level', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 200, swapLevel: 200 },
     });
     assertFeasible(r);
     assertEq(r.params.mpWashStop, 200, 'Swap Level remains at the target level');
     assertTrue(r.finalHP >= 25000, 'HP goal still met');
-    const phases = phasePlan(CLASSES['Night Lord'], r.__state, r.__goals, r);
+    const phases = phasePlan(CLASSES['Assassin'], r.__state, r.__goals, r);
     const targetEvent = phases.find(p => p.range === 'At Lvl 200' && /Reset Base INT/.test(p.action));
     assertTrue(Boolean(targetEvent), 'target-level swap event includes the Base INT reset');
     if (r.params.swapBurst > 0) {
@@ -1130,14 +1130,14 @@ describe('Swap Level', () => {
         < targetEvent.action.indexOf('reclaim the swap-level fresh AP'),
       'stale washing happens before the fresh AP is reclaimed');
     }
-    const rows = levelTable(CLASSES['Night Lord'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Assassin'], r.__state, r.__goals, 40, 1.0, r);
     assertEq(rows.at(-1).phase, 'Fresh + Stale HP Wash + Reset INT',
       'target row names every combined swap operation');
   });
 
   test('Swap Level above Target Level is rejected', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 180, swapLevel: 200 },
     });
@@ -1147,7 +1147,7 @@ describe('Swap Level', () => {
 
   test('Swap Level below Current Level is rejected', () => {
     const r = plan({
-      class: 'Night Lord',
+      class: 'Assassin',
       current: NL_START,
       goals: { hpGoal: 25000, mpGoal: 4000, targetLevel: 200, swapLevel: 20 },
     });
@@ -1157,11 +1157,11 @@ describe('Swap Level', () => {
 
   test('A later Swap Level can be cheaper by retaining INT through Fresh HP Washes', () => {
     const early = plan({
-      class: 'Hero',
+      class: 'Fighter',
       goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 80 },
     });
     const late = plan({
-      class: 'Hero',
+      class: 'Fighter',
       goals: { hpGoal: 30000, mpGoal: 2000, targetLevel: 180, swapLevel: 180 },
     });
     assertFeasible(early);
@@ -1190,14 +1190,14 @@ describe('Swap Level', () => {
 describe('Exact fresh-AP scheduling', () => {
   test('A transition level can split one AP into MP and four AP into HP', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 50, hp: 5000, mp: 29940, str: 100, dex: 4, luk: 4, baseInt: 100 },
       goals: { hpGoal: 5274, mpGoal: 29950, targetLevel: 51, swapLevel: 51 },
     });
     assertFeasible(r);
     assertEq(r.apResets, 101, 'one MP wash + four fresh HP washes + 96 INT resets');
     assertEq(r.params.preSwapFreshAtBoundary, 4, 'four boundary AP switch to HP');
-    const row = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r).at(-1);
+    const row = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r).at(-1);
     assertEq(row.mpWashesThisLevel, 1, 'one boundary AP MP-washes');
     assertEq(row.freshHPWashesThisLevel, 4, 'four boundary AP fresh-HP-wash');
     assertEq(row.peakMPThisLevel, 29971, 'the legal order remains below the MP cap');
@@ -1206,7 +1206,7 @@ describe('Exact fresh-AP scheduling', () => {
 
   test('A stale-wash plan first seeds the HP/MP Pool with a fresh HP allocation', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 50, hp: 5000, mp: 1000, str: 100, dex: 4, luk: 4, baseInt: 100 },
       goals: { hpGoal: 5100, mpGoal: 900, targetLevel: 51, swapLevel: 51 },
     });
@@ -1214,13 +1214,13 @@ describe('Exact fresh-AP scheduling', () => {
     assertEq(r.apResets, 97, 'one fresh wash and 96 INT resets beat two illegal stale washes');
     assertEq(r.breakdown.phase3Fresh, 1, 'one AP seeds the shared pool');
     assertEq(r.breakdown.staleHPWash, 0, 'no empty-pool stale wash is emitted');
-    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r);
     assertTrue(rows.every(row => row.hpMPPoolValid), 'every stale-wash row has a prior pool seed');
   });
 
   test('The level-70 advancement AP can supply eleven fresh washes over two levels', () => {
     const r = plan({
-      class: 'Hero',
+      class: 'Fighter',
       current: { level: 69, hp: 5000, mp: 1000, str: 100, dex: 4, luk: 4, baseInt: 4 },
       goals: { hpGoal: 5704, mpGoal: 900, targetLevel: 71, swapLevel: 69 },
     });
@@ -1228,7 +1228,7 @@ describe('Exact fresh-AP scheduling', () => {
     assertEq(r.apResets, 11, 'all required HP comes from fresh washes');
     assertEq(r.breakdown.phase3Fresh, 11, 'exact fresh-wash count');
     assertEq(r.breakdown.staleHPWash, 0, 'no lower-yield stale washes are needed');
-    const rows = levelTable(CLASSES['Hero'], r.__state, r.__goals, 40, 1.0, r);
+    const rows = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r);
     assertEq(rows.find(row => row.level === 70).freshHPWashesThisLevel, 10,
       'level 70 exposes five level-up AP plus five advancement AP');
     assertEq(rows.find(row => row.level === 71).freshHPWashesThisLevel, 1,
@@ -1306,7 +1306,7 @@ describe('Web Worker transport', () => {
     const messages = [];
     const context = {
       importScripts() {},
-      CLASSES: { Hero: {} },
+      CLASSES: { Fighter: {} },
       optimize(classData, currentState, goals, gearInt, mwMultiplier, onProgress) {
         onProgress({ completed: 1, total: 2 });
         return { feasible: true, marker: goals.marker };
@@ -1318,7 +1318,7 @@ describe('Web Worker transport', () => {
     context.self.onmessage({
       data: {
         requestId: 17,
-        className: 'Hero',
+        className: 'Fighter',
         currentState: {},
         goals: { marker: 'newest' },
         gearInt: 0,
@@ -1356,7 +1356,7 @@ describe('Web Worker transport', () => {
 
   test('optimize reports progress over a bounded, monotone outer loop', () => {
     const updates = [];
-    const r = optimize(CLASSES['Dark Knight'],
+    const r = optimize(CLASSES['Spearman'],
       { level: 40, hp: 1000, mp: 300, str: 35, dex: 4, luk: 4, baseInt: 200 },
       { hpGoal: 30000, mpGoal: 4000, targetLevel: 200, swapLevel: 135 },
       40, 1.0, p => updates.push(p));
@@ -1376,7 +1376,7 @@ describe('Web Worker transport', () => {
   });
 
   test('optimize still works with no progress callback (Node tests and inline fallback)', () => {
-    const r = optimize(CLASSES['Night Lord'],
+    const r = optimize(CLASSES['Assassin'],
       { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 4 },
       { hpGoal: 30000, mpGoal: 5000, targetLevel: 180, swapLevel: 160 },
       40, 1.0);

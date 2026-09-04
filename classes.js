@@ -5,10 +5,10 @@
 // MapleLegends grants HP/MP bonuses only on 1st and 2nd job advancement.
 
 const CLASS_ORDER = [
-  'Night Lord', 'Shadower',
-  'Bowmaster', 'Marksman',
-  'Corsair', 'Buccaneer',
-  'Hero', 'Dark Knight', 'Paladin',
+  'Assassin', 'Bandit',
+  'Hunter', 'Crossbowman',
+  'Gunslinger', 'Brawler',
+  'Fighter', 'Spearman', 'Page',
   'Magician',
   'Beginner',
 ];
@@ -22,7 +22,7 @@ const FIRST_JOB_REQUIREMENTS = {
 };
 
 const CLASSES = {
-  'Night Lord': {
+  'Assassin': {
     mainStat: 'LUK',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.THIEF,
     naturalHPPerLevel: 22,
@@ -42,7 +42,7 @@ const CLASSES = {
       { level: 30, hp: 325, mp: 175 },
     ],
   },
-  'Shadower': {
+  'Bandit': {
     mainStat: 'LUK',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.THIEF,
     naturalHPPerLevel: 22,
@@ -62,7 +62,7 @@ const CLASSES = {
       { level: 30, hp: 325, mp: 175 },
     ],
   },
-  'Bowmaster': {
+  'Hunter': {
     mainStat: 'DEX',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.BOWMAN,
     naturalHPPerLevel: 22,
@@ -82,7 +82,7 @@ const CLASSES = {
       { level: 30, hp: 325, mp: 175 },
     ],
   },
-  'Marksman': {
+  'Crossbowman': {
     mainStat: 'DEX',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.BOWMAN,
     naturalHPPerLevel: 22,
@@ -102,7 +102,7 @@ const CLASSES = {
       { level: 30, hp: 325, mp: 175 },
     ],
   },
-  'Corsair': {
+  'Gunslinger': {
     mainStat: 'DEX',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.PIRATE,
     naturalHPPerLevel: 25,
@@ -123,14 +123,14 @@ const CLASSES = {
       { level: 30, hp: 225, mp: 162 },
     ],
   },
-  'Buccaneer': {
+  'Brawler': {
     mainStat: 'STR',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.PIRATE,
     // naturalHPPerLevel is the WITHOUT-MaxHP value; the +30 bonus from Improve Max HP
     // activates at maxHPActivatesAt. freshAPHP, by contrast, is the WITH-MaxHP value
     // (the +20 bonus on AP allocations is baked in). Same asymmetry for Warriors below.
     naturalHPPerLevel: 25,
-    // Same 18-23 range as Corsair; using 20 (floor of 20.5) underestimates MP by ~0.5/lvl.
+    // Same 18-23 range as Gunslinger; using 20 (floor of 20.5) underestimates MP by ~0.5/lvl.
     naturalMPPerLevel: 20,
     freshAPHP: 38,
     staleAPHP: 18,
@@ -147,7 +147,7 @@ const CLASSES = {
       { level: 30, hp: 225, mp: 162 },
     ],
   },
-  'Hero': {
+  'Fighter': {
     mainStat: 'STR',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,
@@ -167,7 +167,7 @@ const CLASSES = {
       { level: 30, hp: 325, mp: 0 },
     ],
   },
-  'Dark Knight': {
+  'Spearman': {
     mainStat: 'STR',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,
@@ -187,7 +187,7 @@ const CLASSES = {
       { level: 30, hp: 0, mp: 125 },
     ],
   },
-  'Paladin': {
+  'Page': {
     mainStat: 'STR',
     firstJobRequirement: FIRST_JOB_REQUIREMENTS.WARRIOR,
     naturalHPPerLevel: 26,

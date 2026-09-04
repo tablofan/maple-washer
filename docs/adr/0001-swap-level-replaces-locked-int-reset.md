@@ -4,7 +4,7 @@ We previously locked "level to reset **Base INT** → **Main Stat**" to **Target
 
 ## What remains coupled
 
-Once INT is flushed, further `-MP +MainStat` MP-wash cycles are net MP-negative: `freshAPMPBase + ⌊Base INT/10⌋` falls below `mpLossPerReset` at low INT (10 + 0 < 12 for a Night Lord). **MP Wash** therefore cannot continue past **Swap Level**, and **Base INT** cannot be rebuilt afterwards. **Target Base INT** must be reached before the swap.
+Once INT is flushed, further `-MP +MainStat` MP-wash cycles are net MP-negative: `freshAPMPBase + ⌊Base INT/10⌋` falls below `mpLossPerReset` at low INT (10 + 0 < 12 for an Assassin). **MP Wash** therefore cannot continue past **Swap Level**, and **Base INT** cannot be rebuilt afterwards. **Target Base INT** must be reached before the swap.
 
 The converse does not hold: stopping **MP Wash** does not require resetting INT immediately. While **Base INT** is retained, fresh AP can go to HP and be paired with `-MP +MainStat` resets. Compared with MP Washing those AP, the reset count is unchanged; it trades fresh-AP MP generation for the class's larger Fresh AP HP gain. The transition can occur part-way through a level, and levels 70/120 provide ten AP because their job advancements award five additional AP.
 

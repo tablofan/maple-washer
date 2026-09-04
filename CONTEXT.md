@@ -47,7 +47,7 @@ _Avoid_: INT gear, equip INT
 **Base INT** + **Gear INT**. The value plugged into per-level MP-gain formulas.
 
 **Main Stat**:
-The combat stat each class scales damage from — STR (Warrior), DEX (Bowman/Pirate-Gunslinger), LUK (Thief), STR (Pirate-Brawler/Buccaneer), and **INT itself** (Magician). For Magicians, INT serves as both the washing currency *and* the **Main Stat**, which is why their wash is much simpler.
+The combat stat each class scales damage from — STR (Warrior), DEX (Bowman/Pirate-Gunslinger), LUK (Thief), STR (Pirate-Brawler), and **INT itself** (Magician). For Magicians, INT serves as both the washing currency *and* the **Main Stat**, which is why their wash is much simpler.
 _Avoid_: primary stat, attacking stat
 
 **First Job Requirement**:
@@ -152,8 +152,8 @@ Differences from MapleWasher's scope: Krythan's sheets include HP Challenges col
 
 ## Example dialogue
 
-> **User:** "I want 30k HP and 4k MP by level 135 on my Night Lord."
-> **Calculator:** "Your HP Goal is 30,000 and MP Goal is 4,000, both at Target Level 135. Minimum MP for a Night Lord at level 135 is 2,025, so 4,000 is feasible."
+> **User:** "I want 30k HP and 4k MP by level 135 on my Assassin."
+> **Calculator:** "Your HP Goal is 30,000 and MP Goal is 4,000, both at Target Level 135. Minimum MP for an Assassin at level 135 is 2,025, so 4,000 is feasible."
 
 ## Flagged ambiguities
 
