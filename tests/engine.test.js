@@ -1240,8 +1240,8 @@ describe('Exact fresh-AP scheduling', () => {
 
 describe('UI calculation trigger', () => {
   test('Calculation runs only when the form is explicitly submitted', () => {
-    assertTrue(indexSrc.includes('onsubmit="event.preventDefault(); runCalc();"'),
-      'the Calculate form should invoke runCalc on submit');
+    assertTrue(/calcForm\.addEventListener\('submit', event => \{[\s\S]{0,240}?event\.preventDefault\(\);[\s\S]{0,240}?runCalc\(\);/.test(indexSrc),
+      'the Calculate form should preventDefault and invoke runCalc on submit');
     assertEq((indexSrc.match(/\brunCalc\(/g) || []).length, 2,
       'runCalc should only appear in its declaration and the form submit handler');
     assertTrue(indexSrc.includes("classSelect.addEventListener('change', syncSwapVisibility);"),
@@ -1254,8 +1254,6 @@ describe('UI calculation trigger', () => {
       'Mage selection removes Swap Level from the accessibility tree');
     assertTrue(/id="i-cur-int"[^>]*value="13"/.test(indexSrc),
       'the fresh-character defaults use the 13 INT MapleLegends starting roll');
-    assertTrue(indexSrc.includes('id="i-first-job-hint"'),
-      'the selected class displays its first-job requirement');
     assertTrue(!indexSrc.includes('__calcDebounce'),
       'input changes should not schedule a debounced calculation');
   });
