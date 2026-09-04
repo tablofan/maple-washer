@@ -709,7 +709,7 @@
       right: 28px;
       top: 24px;
     }
-    .wizard-card form { min-height: 380px; display: flex; flex-direction: column; }
+    .wizard-card form { min-height: 430px; display: flex; flex-direction: column; }
     .wizard-stage { animation: stage-in 300ms cubic-bezier(.2,.8,.2,1); display: none; }
     .wizard-stage.active { display: block; }
     @keyframes stage-in {
@@ -718,6 +718,8 @@
     }
     .stage-body { margin-top: 4px; }
     .form-columns { display: grid; grid-template-columns: 1fr 1.05fr; gap: 58px; }
+    .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 44px; }
+    .field-stack { align-content: start; display: grid; gap: 22px; }
 
     .wizard-card .field { border: 0; display: flex; padding: 0; }
     .wizard-card .field[hidden] { display: none !important; }
@@ -771,28 +773,6 @@
     }
     .wizard-card .field select option { background: #fffefa; color: var(--text); }
 
-    .select-field { gap: 10px; max-width: 560px; }
-    .select-field label { font-size: 13px !important; font-weight: 600 !important; letter-spacing: .12em !important; text-transform: uppercase !important; }
-    .row-field {
-      align-items: center;
-      border-bottom: 1px solid var(--line-soft) !important;
-      display: grid !important;
-      grid-template-columns: minmax(70px, 1fr) minmax(120px, 230px);
-      gap: 18px;
-      min-height: 88px;
-    }
-    .row-field input { min-height: 58px !important; }
-    .row-field .clamp-note { grid-column: 1 / -1; margin: -10px 0 10px; }
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .stat-field {
-      background: rgba(248, 243, 234, .52);
-      border: 1px solid var(--line-soft) !important;
-      border-radius: 9px;
-      gap: 10px;
-      padding: 16px !important;
-    }
-    .stat-field label { text-align: center; }
-    .stat-field input { min-height: 54px !important; }
     .card-field { gap: 10px; }
     .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
     .simple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -904,9 +884,8 @@
       .wizard-card form { min-height: 0; }
       .stage-body { margin-top: 4px; }
       .form-columns, .simple-grid, .review-grid { grid-template-columns: 1fr; gap: 30px; }
-      .row-field { grid-template-columns: 52px minmax(0, 1fr); min-height: 75px; }
-      .stat-grid { gap: 9px; }
-      .stat-field { padding: 10px !important; }
+      .pair-grid { gap: 14px 12px; }
+      .field-stack { gap: 14px; }
       .wizard-card .field input, .wizard-card .field select { font-size: 17px; min-height: 52px; padding: 10px 12px; }
       .wizard-card .field select { background-position: calc(100% - 18px) 23px, calc(100% - 12px) 23px; }
       .wizard-footer { padding-top: 32px; }
@@ -942,31 +921,25 @@
           <li class="step-item active" data-step="0">
             <button class="step-button" type="button" aria-current="step">
               <span class="step-dot"><span class="step-number">1</span><span class="step-check" aria-hidden="true">✓</span></span>
-              <span class="step-copy"><span class="step-name">Class</span><span class="step-detail" id="step-class-detail">Step 1 of 5</span></span>
+              <span class="step-copy"><span class="step-name">Character</span><span class="step-detail" id="step-class-detail">Step 1 of 4</span></span>
             </button>
           </li>
           <li class="step-item" data-step="1">
             <button class="step-button" type="button" disabled>
               <span class="step-dot"><span class="step-number">2</span><span class="step-check" aria-hidden="true">✓</span></span>
-              <span class="step-copy"><span class="step-name">Current state</span><span class="step-detail">Step 2 of 5</span></span>
+              <span class="step-copy"><span class="step-name">Goals</span><span class="step-detail">Step 2 of 4</span></span>
             </button>
           </li>
           <li class="step-item" data-step="2">
             <button class="step-button" type="button" disabled>
               <span class="step-dot"><span class="step-number">3</span><span class="step-check" aria-hidden="true">✓</span></span>
-              <span class="step-copy"><span class="step-name">Goals</span><span class="step-detail">Step 3 of 5</span></span>
+              <span class="step-copy"><span class="step-name">Gear &amp; buffs</span><span class="step-detail">Step 3 of 4</span></span>
             </button>
           </li>
           <li class="step-item" data-step="3">
             <button class="step-button" type="button" disabled>
               <span class="step-dot"><span class="step-number">4</span><span class="step-check" aria-hidden="true">✓</span></span>
-              <span class="step-copy"><span class="step-name">Gear &amp; buffs</span><span class="step-detail">Step 4 of 5</span></span>
-            </button>
-          </li>
-          <li class="step-item" data-step="4">
-            <button class="step-button" type="button" disabled>
-              <span class="step-dot"><span class="step-number">5</span><span class="step-check" aria-hidden="true">✓</span></span>
-              <span class="step-copy"><span class="step-name">Review</span><span class="step-detail">Step 5 of 5</span></span>
+              <span class="step-copy"><span class="step-name">Review</span><span class="step-detail">Step 4 of 4</span></span>
             </button>
           </li>
         </ol>
@@ -975,58 +948,49 @@
       <section class="wizard-card" aria-label="Wash plan builder">
         <form id="calc-form" novalidate>
           <div class="wizard-stage active" data-stage="0">
-            <div class="stage-body">
-              <div class="field select-field">
-                <label for="i-class">Character class</label>
-                <select id="i-class" required></select>
+            <div class="stage-body pair-grid">
+              <div class="field-stack">
+                <div class="field card-field">
+                  <label for="i-class">Class</label>
+                  <select id="i-class" required></select>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-level">Level</label>
+                  <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-hp">HP</label>
+                  <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
+                  <span class="clamp-note" id="i-cur-hp-clamp-note"></span>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-mp">MP</label>
+                  <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
+                  <span class="clamp-note" id="i-cur-mp-clamp-note"></span>
+                </div>
+              </div>
+              <div class="field-stack">
+                <div class="field card-field">
+                  <label for="i-cur-str">STR</label>
+                  <input id="i-cur-str" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-dex">DEX</label>
+                  <input id="i-cur-dex" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-luk">LUK</label>
+                  <input id="i-cur-luk" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                </div>
+                <div class="field card-field">
+                  <label for="i-cur-int">INT</label>
+                  <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="1" hidden>
-            <div class="stage-body form-columns">
-              <div class="form-group">
-                <div class="resource-fields">
-                  <div class="field row-field">
-                    <label for="i-cur-level">Level</label>
-                    <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
-                  </div>
-                  <div class="field row-field">
-                    <label for="i-cur-hp">HP</label>
-                    <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
-                    <span class="clamp-note" id="i-cur-hp-clamp-note"></span>
-                  </div>
-                  <div class="field row-field">
-                    <label for="i-cur-mp">MP</label>
-                    <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
-                    <span class="clamp-note" id="i-cur-mp-clamp-note"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="form-group">
-                <div class="stat-grid">
-                  <div class="field stat-field">
-                    <label for="i-cur-str">STR</label>
-                    <input id="i-cur-str" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
-                  </div>
-                  <div class="field stat-field">
-                    <label for="i-cur-dex">DEX</label>
-                    <input id="i-cur-dex" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
-                  </div>
-                  <div class="field stat-field">
-                    <label for="i-cur-luk">LUK</label>
-                    <input id="i-cur-luk" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
-                  </div>
-                  <div class="field stat-field">
-                    <label for="i-cur-int">INT</label>
-                    <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="wizard-stage" data-stage="2" hidden>
             <div class="stage-body form-columns">
               <div class="form-group">
                 <div class="simple-grid">
@@ -1057,7 +1021,7 @@
             </div>
           </div>
 
-          <div class="wizard-stage" data-stage="3" hidden>
+          <div class="wizard-stage" data-stage="2" hidden>
             <div class="stage-body form-columns">
               <div class="form-group">
                 <div class="field card-field">
@@ -1074,21 +1038,18 @@
             </div>
           </div>
 
-          <div class="wizard-stage" data-stage="4" hidden>
+          <div class="wizard-stage" data-stage="3" hidden>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
-                <div class="review-group-head"><h3>Class</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
-                <div class="review-list"><div class="review-row"><span class="review-label">Character</span><span class="review-value" data-review="class"></span></div></div>
-              </section>
-              <section class="review-group">
-                <div class="review-group-head"><h3>Current state</h3><button class="review-edit" type="button" data-edit-step="1">Edit</button></div>
+                <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
                 <div class="review-list">
+                  <div class="review-row"><span class="review-label">Class</span><span class="review-value" data-review="class"></span></div>
                   <div class="review-row"><span class="review-label">Level · HP · MP</span><span class="review-value" data-review="current"></span></div>
                   <div class="review-row"><span class="review-label">STR · DEX · LUK · INT</span><span class="review-value" data-review="stats"></span></div>
                 </div>
               </section>
               <section class="review-group">
-                <div class="review-group-head"><h3>Goals</h3><button class="review-edit" type="button" data-edit-step="2">Edit</button></div>
+                <div class="review-group-head"><h3>Goals</h3><button class="review-edit" type="button" data-edit-step="1">Edit</button></div>
                 <div class="review-list">
                   <div class="review-row"><span class="review-label">Target level</span><span class="review-value" data-review="target-level"></span></div>
                   <div class="review-row"><span class="review-label">HP · MP goals</span><span class="review-value" data-review="goals"></span></div>
@@ -1096,7 +1057,7 @@
                 </div>
               </section>
               <section class="review-group">
-                <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="3">Edit</button></div>
+                <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="2">Edit</button></div>
                 <div class="review-list">
                   <div class="review-row"><span class="review-label">Gear INT</span><span class="review-value" data-review="gear"></span></div>
                   <div class="review-row"><span class="review-label">Maple Warrior</span><span class="review-value" data-review="mw"></span></div>
@@ -1251,7 +1212,7 @@
         else button.removeAttribute('aria-current');
       });
 
-      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 5';
+      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 4';
       $('btn-back').hidden = currentWizardStep === 0;
       $('btn-next').hidden = currentWizardStep === wizardStages.length - 1;
       $('btn-calc').hidden = currentWizardStep !== wizardStages.length - 1;
@@ -1746,7 +1707,7 @@
       // Hidden alone removes the field visually; disabled also removes it from keyboard/form
       // interaction so Magicians genuinely have no Swap Level option.
       swapInput.disabled = isMage;
-      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 5';
+      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 4';
       if (currentWizardStep === wizardStages.length - 1) updateReview();
     }
 
