@@ -173,6 +173,7 @@
       border-bottom: 1px solid var(--line);
       transition: border-color 0.2s ease;
     }
+    .field[hidden] { display: none !important; }
     .field:focus-within { border-color: var(--maple); }
     .field label {
       font-family: 'Inter Tight', sans-serif;
@@ -604,138 +605,630 @@
       .calc-row { flex-direction: column; align-items: stretch; }
       .stat-value.feature { font-size: 26px; }
     }
+
+    /* Maple Field Guide wizard */
+    :root {
+      --bg: #f5f1e8;
+      --surface: #fffdf8;
+      --surface-2: #f7f0e5;
+      --line: #cbbca7;
+      --line-soft: #e4dacb;
+      --text: #151914;
+      --text-2: #3f4b40;
+      --text-mute: #6f756d;
+      --text-faint: #8e8b82;
+      --maple: #ec3d24;
+      --maple-glow: rgba(236, 61, 36, 0.1);
+      --amber: #c99335;
+      --moss: #0f5536;
+      --clay: #a26945;
+      --shadow: 0 28px 70px rgba(65, 48, 28, 0.08);
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(ellipse 70% 45% at 68% -10%, rgba(224, 190, 135, 0.14), transparent),
+        url("data:image/svg+xml;utf8,<svg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .025 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      color: var(--text);
+    }
+
+    .frame {
+      width: min(100%, 1440px);
+      max-width: none;
+      padding: 34px 54px 52px;
+    }
+
+    .site-header { margin-bottom: 30px; }
+    .head { align-items: center; gap: 16px; margin-bottom: 2px; }
+    .mark { width: 38px; height: 38px; transform: none; }
+    .mark path { fill: none; stroke: var(--maple); stroke-width: 1.35; }
+    .wordmark { color: var(--text); font-size: clamp(38px, 4vw, 52px); }
+    .tagline {
+      border-left: 0;
+      color: var(--text-2);
+      font-style: normal;
+      font-size: 17px;
+      margin-left: 6px;
+      padding: 10px 0 0;
+    }
+    .meta-line {
+      color: var(--text-2);
+      font-family: 'Fraunces', serif;
+      font-size: 17px;
+      letter-spacing: 0;
+      margin: 0 0 0 54px;
+      text-transform: none;
+    }
+
+    .wizard-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 34px;
+      align-items: start;
+    }
+
+    .wizard-progress {
+      padding: 26px 0 20px;
+      position: sticky;
+      top: 18px;
+    }
+    .wizard-progress ol { list-style: none; }
+    .step-item { position: relative; min-height: 116px; }
+    .step-item:last-child { min-height: 56px; }
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      z-index: 0;
+      left: 27px;
+      top: 54px;
+      bottom: 0;
+      width: 1px;
+      background: var(--line);
+      transition: background 220ms ease;
+    }
+    .step-item.complete::after { background: rgba(15, 85, 54, 0.55); }
+    .step-button {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 18px;
+      padding: 0;
+      text-align: left;
+      width: 100%;
+    }
+    .step-button:disabled { cursor: default; }
+    .step-button:focus-visible { outline: 2px solid var(--maple); outline-offset: 5px; border-radius: 4px; }
+    .step-dot {
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid #837b6f;
+      border-radius: 50%;
+      display: flex;
+      font-family: 'Fraunces', serif;
+      font-size: 25px;
+      height: 56px;
+      justify-content: center;
+      position: relative;
+      transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+      width: 56px;
+      z-index: 1;
+    }
+    .step-item.active .step-dot { border: 2px solid var(--maple); color: var(--maple); }
+    .step-item.complete .step-dot { border: 2px solid var(--moss); color: var(--moss); }
+    .step-check { display: none; font-family: 'Inter Tight', sans-serif; font-size: 27px; font-weight: 500; }
+    .step-item.complete .step-number { display: none; }
+    .step-item.complete .step-check { display: block; }
+    .step-copy { padding-top: 8px; }
+    .step-name { display: block; font-family: 'Fraunces', serif; font-size: 22px; line-height: 1.2; }
+    .step-detail { color: var(--text-mute); display: block; font-size: 14px; margin-top: 7px; }
+    .step-item.active .step-detail { color: var(--maple); }
+    .step-item.complete .step-detail { color: var(--moss); }
+
+    .wizard-card {
+      background: rgba(255, 253, 248, 0.74);
+      border: 1px solid #bcae99;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      min-height: 660px;
+      overflow: hidden;
+      padding: clamp(34px, 5vw, 62px);
+      position: relative;
+    }
+    .wizard-card::after {
+      color: #ad9f8a;
+      content: '\2733';
+      font-size: 33px;
+      opacity: 0.7;
+      position: absolute;
+      right: 28px;
+      top: 24px;
+    }
+    .wizard-card form { min-height: 535px; display: flex; flex-direction: column; }
+    .wizard-stage { animation: stage-in 300ms cubic-bezier(.2,.8,.2,1); display: none; }
+    .wizard-stage.active { display: block; }
+    @keyframes stage-in {
+      from { opacity: 0; transform: translateX(10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .stage-kicker {
+      color: var(--maple);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .16em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .stage-heading {
+      color: var(--text);
+      font-family: 'Fraunces', serif;
+      font-size: clamp(36px, 4vw, 54px);
+      font-variation-settings: 'opsz' 90, 'SOFT' 70;
+      font-weight: 450;
+      letter-spacing: -.035em;
+      line-height: 1.08;
+      max-width: 760px;
+    }
+    .stage-subtitle { color: var(--text-2); font-size: 17px; margin-top: 14px; max-width: 650px; }
+    .stage-body { margin-top: 44px; }
+    .form-columns { display: grid; grid-template-columns: 1fr 1.05fr; gap: 58px; }
+    .form-group-title {
+      align-items: center;
+      color: var(--moss);
+      display: flex;
+      font-family: 'Fraunces', serif;
+      font-size: 24px;
+      font-weight: 480;
+      gap: 16px;
+      margin-bottom: 24px;
+      white-space: nowrap;
+    }
+    .form-group-title::after { background: var(--line); content: ''; height: 1px; width: 100%; }
+    .group-note { color: var(--text-mute); font-size: 13px; margin: -13px 0 20px; }
+
+    .wizard-card .field { border: 0; display: flex; padding: 0; }
+    .wizard-card .field[hidden] { display: none !important; }
+    .wizard-card .field label {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0;
+      margin: 0;
+      text-transform: none;
+    }
+    .wizard-card .field:focus-within label { color: var(--maple); }
+    .wizard-card .field input,
+    .wizard-card .field select {
+      appearance: textfield;
+      background: rgba(255, 255, 255, .72);
+      border: 1px solid #bbae9c;
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 500;
+      min-height: 58px;
+      outline: none;
+      padding: 12px 16px;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      width: 100%;
+    }
+    .wizard-card .field input::-webkit-inner-spin-button,
+    .wizard-card .field input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+    .wizard-card .field input:hover,
+    .wizard-card .field select:hover { border-color: #8d8172; }
+    .wizard-card .field input:focus,
+    .wizard-card .field select:focus {
+      background: #fffefa;
+      border-color: var(--maple);
+      box-shadow: 0 0 0 3px var(--maple-glow);
+    }
+    .wizard-card .field.invalid input,
+    .wizard-card .field.invalid select { border-color: var(--maple); }
+    .wizard-card .field select {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%), linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
+      background-position: calc(100% - 20px) 26px, calc(100% - 14px) 26px;
+      background-repeat: no-repeat;
+      background-size: 6px 6px;
+      cursor: pointer;
+      font-family: 'Fraunces', serif;
+      font-size: 20px;
+      padding-right: 42px;
+    }
+    .wizard-card .field select option { background: #fffefa; color: var(--text); }
+
+    .select-field { gap: 10px; max-width: 560px; }
+    .select-field label { font-size: 13px !important; font-weight: 600 !important; letter-spacing: .12em !important; text-transform: uppercase !important; }
+    .select-field .hint { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+    .resource-fields { border-top: 1px solid var(--line-soft); }
+    .row-field {
+      align-items: center;
+      border-bottom: 1px solid var(--line-soft) !important;
+      display: grid !important;
+      grid-template-columns: minmax(70px, 1fr) minmax(120px, 230px);
+      gap: 18px;
+      min-height: 88px;
+    }
+    .row-field input { min-height: 58px !important; }
+    .row-field .clamp-note { grid-column: 1 / -1; margin: -10px 0 10px; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .stat-field {
+      background: rgba(248, 243, 234, .52);
+      border: 1px solid var(--line-soft) !important;
+      border-radius: 9px;
+      gap: 10px;
+      padding: 16px !important;
+    }
+    .stat-field label { text-align: center; }
+    .stat-field input { min-height: 54px !important; }
+    .card-field { gap: 10px; }
+    .card-field .hint, .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
+    .simple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 44px; }
+    .review-group { border-top: 1px solid var(--line); padding-top: 16px; }
+    .review-group-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .review-group h3 { color: var(--moss); font-family: 'Fraunces', serif; font-size: 20px; font-weight: 500; }
+    .review-edit {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--text-2);
+      cursor: pointer;
+      font: 600 11px 'Inter Tight', sans-serif;
+      letter-spacing: .12em;
+      padding: 2px 0;
+      text-transform: uppercase;
+    }
+    .review-edit:hover { border-color: var(--maple); color: var(--maple); }
+    .review-list { display: grid; gap: 8px; }
+    .review-row { align-items: baseline; display: flex; flex-wrap: wrap; gap: 2px 14px; justify-content: space-between; }
+    .review-label { color: var(--text-mute); font-size: 13px; white-space: nowrap; }
+    .review-value { color: var(--text); flex: 1 1 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; min-width: 0; text-align: right; }
+
+    .wizard-footer { margin-top: auto; padding-top: 42px; }
+    .form-error {
+      background: var(--maple-glow);
+      border-left: 2px solid var(--maple);
+      border-radius: 0 6px 6px 0;
+      color: #a52314;
+      margin-bottom: 18px;
+      margin-top: 0;
+      padding: 10px 12px;
+    }
+    .wizard-actions { align-items: center; display: flex; justify-content: space-between; }
+    .btn-back, .btn-next, .btn-calc {
+      align-items: center;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      font-family: 'Fraunces', serif;
+      font-size: 19px;
+      gap: 14px;
+      justify-content: center;
+      min-height: 54px;
+      padding: 12px 28px;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+    .btn-back { background: transparent; border: 1px solid var(--line); color: var(--text); }
+    .btn-back:hover { border-color: var(--text-2); transform: translateX(-2px); }
+    .btn-back[hidden] { display: none; }
+    .btn-next, .btn-calc {
+      background: linear-gradient(135deg, #d3a34c, #bd8127);
+      border: 1px solid #a46e20;
+      box-shadow: 0 8px 18px rgba(147, 95, 22, .16);
+      color: #fffdf8;
+      margin-left: auto;
+      min-width: 220px;
+    }
+    .btn-next:hover, .btn-calc:hover { background: linear-gradient(135deg, #ddb35d, #c88c31); box-shadow: 0 11px 24px rgba(147, 95, 22, .23); transform: translateY(-1px); }
+    .btn-calc[hidden], .btn-next[hidden] { display: none; }
+    .btn-calc[disabled] { cursor: progress; opacity: .6; }
+    .calc-hint { color: var(--text-mute); display: block; font-size: 12px; margin-top: 12px; text-align: right; }
+    .calc-progress { color: var(--text-mute); justify-content: flex-end; margin-top: 12px; }
+    .calc-progress-track { background: var(--line-soft); }
+
+    .result.section {
+      background: rgba(255, 253, 248, .72);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin: 42px 0 0 284px;
+      padding: 36px 44px;
+    }
+    .result .section-title { color: var(--text-2); }
+    .result .section-rule { background: var(--line-soft); }
+    .stat-value.feature { color: var(--amber); }
+    table.lt thead th { background: var(--surface-2); }
+    table.lt tr:hover td { background: rgba(201, 147, 53, .06); }
+    .footer { color: var(--text-mute); margin-top: 58px; }
+    .footer a { color: var(--text-2); }
+
+    @media (max-width: 980px) {
+      .frame { padding-inline: 30px; }
+      .wizard-layout { grid-template-columns: 205px minmax(0, 1fr); gap: 24px; }
+      .form-columns { gap: 30px; }
+      .step-button { gap: 12px; }
+      .step-name { font-size: 19px; }
+      .result.section { margin-left: 229px; }
+    }
+
+    @media (max-width: 700px) {
+      .frame { padding: 22px 14px 40px; }
+      .site-header { margin-bottom: 20px; padding-left: 4px; }
+      .head { align-items: flex-start; gap: 9px; }
+      .mark { height: 28px; margin-top: 5px; width: 28px; }
+      .wordmark { font-size: 31px; }
+      .tagline { display: none; }
+      .meta-line { font-size: 14px; margin-left: 38px; }
+      .wizard-layout { grid-template-columns: 48px minmax(0, 1fr); gap: 9px; }
+      .wizard-progress { padding-top: 18px; }
+      .step-item { min-height: 84px; }
+      .step-item:last-child { min-height: 42px; }
+      .step-item:not(:last-child)::after { left: 20px; top: 42px; }
+      .step-button { display: block; }
+      .step-dot { font-size: 19px; height: 42px; width: 42px; }
+      .step-check { font-size: 21px; }
+      .step-copy { display: none; }
+      .wizard-card { border-radius: 12px; min-height: 0; padding: 34px 18px 24px; }
+      .wizard-card::after { font-size: 24px; right: 14px; top: 12px; }
+      .wizard-card form { min-height: 0; }
+      .stage-kicker { font-size: 9px; }
+      .stage-heading { font-size: 31px; padding-right: 6px; }
+      .stage-subtitle { font-size: 15px; }
+      .stage-body { margin-top: 30px; }
+      .form-columns, .simple-grid, .review-grid { grid-template-columns: 1fr; gap: 30px; }
+      .form-group-title { font-size: 20px; margin-bottom: 17px; }
+      .row-field { grid-template-columns: 52px minmax(0, 1fr); min-height: 75px; }
+      .stat-grid { gap: 9px; }
+      .stat-field { padding: 10px !important; }
+      .wizard-card .field input, .wizard-card .field select { font-size: 17px; min-height: 52px; padding: 10px 12px; }
+      .wizard-card .field select { background-position: calc(100% - 18px) 23px, calc(100% - 12px) 23px; }
+      .wizard-footer { padding-top: 32px; }
+      .wizard-actions { gap: 9px; }
+      .btn-back, .btn-next, .btn-calc { font-size: 16px; min-height: 50px; padding: 10px 15px; }
+      .btn-next, .btn-calc { min-width: 0; }
+      .btn-back { flex: 0 0 auto; }
+      .btn-next, .btn-calc { flex: 1; }
+      .calc-hint { text-align: left; }
+      .result.section { margin-left: 0; padding: 24px 18px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .br-row { grid-template-columns: 56px 92px 1fr; gap: 8px; }
+      .phase { grid-template-columns: 1fr; gap: 6px; }
+      .footer { font-size: 12px; }
+    }
   </style>
 </head>
 <body>
   <main class="frame">
 
-    <header>
+    <header class="site-header">
       <div class="head">
         <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
           <path d="M16 2 L19 9 L26 8 L22 14 L28 18 L21 19 L22 26 L16 22 L10 26 L11 19 L4 18 L10 14 L6 8 L13 9 Z"/>
         </svg>
         <h1 class="wordmark">Maple<span class="em-w">Washer</span></h1>
-        <span class="tagline">An HP/MP wash planner for MapleLegends</span>
+        <span class="tagline">HP/MP wash planner</span>
       </div>
-      <div class="meta-line">
-        Mid-range averages · Following Nise's formula compilation · <a href="https://forum.legends.ml/index.php?threads/nises-hp-washing-formula-compilation.38558/" target="_blank" rel="noopener">source</a>
-      </div>
+      <div class="meta-line">Build your wash plan</div>
     </header>
 
-    <form id="calc-form" onsubmit="event.preventDefault(); runCalc();">
-    <section class="section">
-      <div class="section-head">
-        <span class="section-num">i.</span>
-        <h2 class="section-title">your character</h2>
-        <span class="section-rule"></span>
-      </div>
+    <div class="wizard-layout">
+      <nav class="wizard-progress" aria-label="Wash plan progress">
+        <ol>
+          <li class="step-item active" data-step="0">
+            <button class="step-button" type="button" aria-current="step">
+              <span class="step-dot"><span class="step-number">1</span><span class="step-check" aria-hidden="true">✓</span></span>
+              <span class="step-copy"><span class="step-name">Class</span><span class="step-detail" id="step-class-detail">Step 1 of 5</span></span>
+            </button>
+          </li>
+          <li class="step-item" data-step="1">
+            <button class="step-button" type="button" disabled>
+              <span class="step-dot"><span class="step-number">2</span><span class="step-check" aria-hidden="true">✓</span></span>
+              <span class="step-copy"><span class="step-name">Current state</span><span class="step-detail">Step 2 of 5</span></span>
+            </button>
+          </li>
+          <li class="step-item" data-step="2">
+            <button class="step-button" type="button" disabled>
+              <span class="step-dot"><span class="step-number">3</span><span class="step-check" aria-hidden="true">✓</span></span>
+              <span class="step-copy"><span class="step-name">Goals</span><span class="step-detail">Step 3 of 5</span></span>
+            </button>
+          </li>
+          <li class="step-item" data-step="3">
+            <button class="step-button" type="button" disabled>
+              <span class="step-dot"><span class="step-number">4</span><span class="step-check" aria-hidden="true">✓</span></span>
+              <span class="step-copy"><span class="step-name">Gear &amp; buffs</span><span class="step-detail">Step 4 of 5</span></span>
+            </button>
+          </li>
+          <li class="step-item" data-step="4">
+            <button class="step-button" type="button" disabled>
+              <span class="step-dot"><span class="step-number">5</span><span class="step-check" aria-hidden="true">✓</span></span>
+              <span class="step-copy"><span class="step-name">Review</span><span class="step-detail">Step 5 of 5</span></span>
+            </button>
+          </li>
+        </ol>
+      </nav>
 
-      <div class="input-group">
-        <div class="group-label">Class</div>
-        <div class="field-grid">
-          <div class="field" style="grid-column: 1 / -1;">
-            <label for="i-class">job</label>
-            <select id="i-class"></select>
-            <span class="hint" id="i-first-job-hint"></span>
+      <section class="wizard-card" aria-label="Wash plan builder">
+        <form id="calc-form" novalidate>
+          <div class="wizard-stage active" data-stage="0">
+            <div class="stage-kicker">Step 1 of 5</div>
+            <h2 class="stage-heading">Choose your class</h2>
+            <p class="stage-subtitle">We’ll tailor the HP and MP formulas to your character.</p>
+            <div class="stage-body">
+              <div class="field select-field">
+                <label for="i-class">Character class</label>
+                <select id="i-class" required></select>
+                <span class="hint" id="i-first-job-hint"></span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="input-group">
-        <div class="group-label">Current state <span class="nb">— defaults are a fresh level 1</span></div>
-        <div class="field-grid">
-          <div class="field">
-            <label for="i-cur-level">level</label>
-            <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
+          <div class="wizard-stage" data-stage="1" hidden>
+            <div class="stage-kicker">Step 2 of 5</div>
+            <h2 class="stage-heading">Where is your character now?</h2>
+            <p class="stage-subtitle">Enter your current level and stats. You can type or paste values, then use Tab to move quickly.</p>
+            <div class="stage-body form-columns">
+              <div class="form-group">
+                <h3 class="form-group-title">Level &amp; resources</h3>
+                <div class="resource-fields">
+                  <div class="field row-field">
+                    <label for="i-cur-level">Level</label>
+                    <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
+                  </div>
+                  <div class="field row-field">
+                    <label for="i-cur-hp">HP</label>
+                    <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
+                    <span class="clamp-note" id="i-cur-hp-clamp-note"></span>
+                  </div>
+                  <div class="field row-field">
+                    <label for="i-cur-mp">MP</label>
+                    <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
+                    <span class="clamp-note" id="i-cur-mp-clamp-note"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <h3 class="form-group-title">Base stats</h3>
+                <p class="group-note">AP allocation only, excluding gear.</p>
+                <div class="stat-grid">
+                  <div class="field stat-field">
+                    <label for="i-cur-str">STR</label>
+                    <input id="i-cur-str" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                  </div>
+                  <div class="field stat-field">
+                    <label for="i-cur-dex">DEX</label>
+                    <input id="i-cur-dex" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                  </div>
+                  <div class="field stat-field">
+                    <label for="i-cur-luk">LUK</label>
+                    <input id="i-cur-luk" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+                  </div>
+                  <div class="field stat-field">
+                    <label for="i-cur-int">INT</label>
+                    <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label for="i-cur-hp">hp</label>
-            <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
-            <span class="clamp-note" id="i-cur-hp-clamp-note"></span>
-          </div>
-          <div class="field">
-            <label for="i-cur-mp">mp</label>
-            <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
-            <span class="clamp-note" id="i-cur-mp-clamp-note"></span>
-          </div>
-        </div>
-      </div>
 
-      <div class="input-group">
-        <div class="group-label">Base stats <span class="nb">— from AP allocation, excluding gear</span></div>
-        <div class="field-grid">
-          <div class="field">
-            <label for="i-cur-str">str</label>
-            <input id="i-cur-str" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
+          <div class="wizard-stage" data-stage="2" hidden>
+            <div class="stage-kicker">Step 3 of 5</div>
+            <h2 class="stage-heading">What are you building toward?</h2>
+            <p class="stage-subtitle">Set the level and HP/MP targets you want the plan to reach.</p>
+            <div class="stage-body form-columns">
+              <div class="form-group">
+                <h3 class="form-group-title">Destination</h3>
+                <div class="simple-grid">
+                  <div class="field card-field">
+                    <label for="i-target-level">Target level</label>
+                    <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
+                  </div>
+                  <div class="field card-field" id="f-swap-level">
+                    <label for="i-swap-level">Swap level</label>
+                    <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
+                    <span class="hint" id="i-swap-level-hint"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <h3 class="form-group-title">Target stats</h3>
+                <div class="simple-grid">
+                  <div class="field card-field">
+                    <label for="i-hp-goal">HP goal</label>
+                    <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" required>
+                    <span class="clamp-note" id="i-hp-goal-clamp-note"></span>
+                  </div>
+                  <div class="field card-field">
+                    <label for="i-mp-goal">MP goal</label>
+                    <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" required>
+                    <span class="clamp-note" id="i-mp-goal-clamp-note"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label for="i-cur-dex">dex</label>
-            <input id="i-cur-dex" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
-          </div>
-          <div class="field">
-            <label for="i-cur-luk">luk</label>
-            <input id="i-cur-luk" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
-          </div>
-          <div class="field">
-            <label for="i-cur-int">int</label>
-            <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
-          </div>
-        </div>
-      </div>
 
-      <div class="input-group">
-        <div class="group-label">Goals</div>
-        <div class="field-grid">
-          <div class="field">
-            <label for="i-hp-goal">hp goal</label>
-            <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" required>
-            <span class="clamp-note" id="i-hp-goal-clamp-note"></span>
+          <div class="wizard-stage" data-stage="3" hidden>
+            <div class="stage-kicker">Step 4 of 5</div>
+            <h2 class="stage-heading">Add your gear &amp; buffs</h2>
+            <p class="stage-subtitle">Include the INT you expect to wear while levelling.</p>
+            <div class="stage-body form-columns">
+              <div class="form-group">
+                <h3 class="form-group-title">Equipment</h3>
+                <div class="field card-field">
+                  <label for="i-gear-int">Gear INT</label>
+                  <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
+                  <span class="hint">Treated as worn from level 10 onward.</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <h3 class="form-group-title">Buffs</h3>
+                <div class="field card-field">
+                  <label for="i-mw">Maple Warrior</label>
+                  <select id="i-mw"></select>
+                  <span class="hint">Applied to Base INT only.</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label for="i-mp-goal">mp goal</label>
-            <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" required>
-            <span class="clamp-note" id="i-mp-goal-clamp-note"></span>
-          </div>
-          <div class="field">
-            <label for="i-target-level">target level</label>
-            <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
-          </div>
-          <div class="field" id="f-swap-level">
-            <label for="i-swap-level">swap level</label>
-            <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
-            <span class="hint" id="i-swap-level-hint"></span>
-          </div>
-        </div>
-      </div>
 
-      <div class="input-group">
-        <div class="group-label">Gear &amp; buffs <span class="nb">— INT gear is treated as worn from lvl 10 onward</span></div>
-        <div class="field-grid">
-          <div class="field">
-            <label for="i-gear-int">gear int</label>
-            <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
+          <div class="wizard-stage" data-stage="4" hidden>
+            <div class="stage-kicker">Step 5 of 5</div>
+            <h2 class="stage-heading">Review your wash plan</h2>
+            <p class="stage-subtitle">Check the details below, then calculate the most efficient route.</p>
+            <div class="stage-body review-grid" id="review-content">
+              <section class="review-group">
+                <div class="review-group-head"><h3>Class</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
+                <div class="review-list"><div class="review-row"><span class="review-label">Character</span><span class="review-value" data-review="class"></span></div></div>
+              </section>
+              <section class="review-group">
+                <div class="review-group-head"><h3>Current state</h3><button class="review-edit" type="button" data-edit-step="1">Edit</button></div>
+                <div class="review-list">
+                  <div class="review-row"><span class="review-label">Level · HP · MP</span><span class="review-value" data-review="current"></span></div>
+                  <div class="review-row"><span class="review-label">STR · DEX · LUK · INT</span><span class="review-value" data-review="stats"></span></div>
+                </div>
+              </section>
+              <section class="review-group">
+                <div class="review-group-head"><h3>Goals</h3><button class="review-edit" type="button" data-edit-step="2">Edit</button></div>
+                <div class="review-list">
+                  <div class="review-row"><span class="review-label">Target level</span><span class="review-value" data-review="target-level"></span></div>
+                  <div class="review-row"><span class="review-label">HP · MP goals</span><span class="review-value" data-review="goals"></span></div>
+                  <div class="review-row" id="review-swap-row"><span class="review-label">Swap level</span><span class="review-value" data-review="swap"></span></div>
+                </div>
+              </section>
+              <section class="review-group">
+                <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="3">Edit</button></div>
+                <div class="review-list">
+                  <div class="review-row"><span class="review-label">Gear INT</span><span class="review-value" data-review="gear"></span></div>
+                  <div class="review-row"><span class="review-label">Maple Warrior</span><span class="review-value" data-review="mw"></span></div>
+                </div>
+              </section>
+            </div>
           </div>
-          <div class="field">
-            <label for="i-mw">maple warrior</label>
-            <select id="i-mw"></select>
+
+          <div class="wizard-footer">
+            <div class="form-error" id="form-error" role="alert" aria-live="polite" hidden></div>
+            <div class="wizard-actions">
+              <button id="btn-back" type="button" class="btn-back" hidden><span aria-hidden="true">←</span> Back</button>
+              <button id="btn-next" type="button" class="btn-next">Continue <span aria-hidden="true">→</span></button>
+              <button id="btn-calc" type="submit" class="btn-calc" hidden>Calculate plan <span class="arr" aria-hidden="true">→</span></button>
+            </div>
+            <span class="calc-hint" id="calc-hint">Your values stay editable until you calculate.</span>
+            <span class="calc-progress" id="calc-progress" role="status" aria-live="polite">
+              <span class="calc-progress-track"><span class="calc-progress-bar" id="calc-progress-bar"></span></span>
+              <span id="calc-progress-label">Calculating…</span>
+            </span>
           </div>
-        </div>
-      </div>
-
-      <div class="form-error" id="form-error" role="alert" aria-live="polite" hidden></div>
-
-      <div class="calc-row">
-        <button id="btn-calc" type="submit" class="btn-calc">Calculate optimal plan <span class="arr">→</span></button>
-        <span class="calc-hint" id="calc-hint">Output recomputes when you change inputs. Press Enter to recalculate.</span>
-        <span class="calc-progress" id="calc-progress" role="status" aria-live="polite">
-          <span class="calc-progress-track">
-            <span class="calc-progress-bar" id="calc-progress-bar"></span>
-          </span>
-          <span id="calc-progress-label">Calculating…</span>
-        </span>
-      </div>
-    </section>
-    </form>
+        </form>
+      </section>
+    </div>
 
     <section class="section result" id="result">
       <div class="section-head">
@@ -825,6 +1318,126 @@
 
     const $ = id => document.getElementById(id);
     const fmt = n => Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+    // ── Sequential wizard ──────────────────────────────────────────────────────────────────
+    const wizardStages = [...document.querySelectorAll('.wizard-stage')];
+    const wizardSteps = [...document.querySelectorAll('.step-item')];
+    const calcForm = $('calc-form');
+    let currentWizardStep = 0;
+    let furthestWizardStep = 0;
+
+    function updateReview() {
+      const put = (key, value) => {
+        const el = document.querySelector(`[data-review="${key}"]`);
+        if (el) el.textContent = value;
+      };
+      put('class', classSelect.value);
+      put('current', `${$('i-cur-level').value} · ${$('i-cur-hp').value}\u00a0HP · ${$('i-cur-mp').value}\u00a0MP`);
+      put('stats', `${$('i-cur-str').value} · ${$('i-cur-dex').value} · ${$('i-cur-luk').value} · ${$('i-cur-int').value}`);
+      put('target-level', $('i-target-level').value);
+      put('goals', `${$('i-hp-goal').value}\u00a0HP · ${$('i-mp-goal').value}\u00a0MP`);
+      put('swap', $('i-swap-level').value);
+      put('gear', $('i-gear-int').value);
+      put('mw', mwSelect.options[mwSelect.selectedIndex]?.textContent || 'None');
+      $('review-swap-row').hidden = CLASSES[classSelect.value].isMage;
+    }
+
+    function setWizardStep(nextStep, focusField = true) {
+      currentWizardStep = Math.max(0, Math.min(wizardStages.length - 1, nextStep));
+      if (currentWizardStep === wizardStages.length - 1) updateReview();
+
+      wizardStages.forEach((stage, index) => {
+        const active = index === currentWizardStep;
+        stage.hidden = !active;
+        stage.classList.toggle('active', active);
+      });
+      wizardSteps.forEach((step, index) => {
+        const button = step.querySelector('.step-button');
+        step.classList.toggle('active', index === currentWizardStep);
+        step.classList.toggle('complete', index < currentWizardStep);
+        button.disabled = index > furthestWizardStep;
+        if (index === currentWizardStep) button.setAttribute('aria-current', 'step');
+        else button.removeAttribute('aria-current');
+      });
+
+      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 5';
+      $('btn-back').hidden = currentWizardStep === 0;
+      $('btn-next').hidden = currentWizardStep === wizardStages.length - 1;
+      $('btn-calc').hidden = currentWizardStep !== wizardStages.length - 1;
+      $('calc-hint').textContent = currentWizardStep === wizardStages.length - 1
+        ? 'Calculation uses mid-range MapleLegends averages.'
+        : 'Press Enter or choose Continue to move to the next step.';
+      showFormError(null);
+
+      if (focusField) {
+        requestAnimationFrame(() => {
+          const firstControl = wizardStages[currentWizardStep].querySelector('input:not([disabled]), select:not([disabled])');
+          if (firstControl) firstControl.focus({ preventScroll: true });
+        });
+      }
+    }
+
+    function validateWizardStep(stepIndex) {
+      const controls = [...wizardStages[stepIndex].querySelectorAll('input, select')]
+        .filter(control => !control.disabled);
+      for (const control of controls) {
+        const field = control.closest('.field');
+        field?.classList.toggle('invalid', !control.checkValidity());
+        if (!control.checkValidity()) {
+          control.reportValidity();
+          return false;
+        }
+      }
+
+      if (stepIndex === 2) {
+        const currentLevel = Number($('i-cur-level').value);
+        const targetLevel = Number($('i-target-level').value);
+        const swapLevel = Number($('i-swap-level').value);
+        const isMage = CLASSES[classSelect.value].isMage;
+        if (targetLevel <= currentLevel) {
+          $('i-target-level').closest('.field').classList.add('invalid');
+          showFormError(`Target Level (${targetLevel}) must be greater than Current Level (${currentLevel}).`);
+          $('i-target-level').focus();
+          return false;
+        }
+        if (!isMage && (swapLevel < currentLevel || swapLevel > targetLevel)) {
+          $('i-swap-level').closest('.field').classList.add('invalid');
+          showFormError(`Swap Level must be between Current Level (${currentLevel}) and Target Level (${targetLevel}).`);
+          $('i-swap-level').focus();
+          return false;
+        }
+      }
+      showFormError(null);
+      return true;
+    }
+
+    function advanceWizard() {
+      if (!validateWizardStep(currentWizardStep)) return;
+      furthestWizardStep = Math.max(furthestWizardStep, currentWizardStep + 1);
+      setWizardStep(currentWizardStep + 1);
+    }
+
+    $('btn-next').addEventListener('click', advanceWizard);
+    $('btn-back').addEventListener('click', () => setWizardStep(currentWizardStep - 1));
+    wizardSteps.forEach((step, index) => {
+      step.querySelector('.step-button').addEventListener('click', () => {
+        if (index <= furthestWizardStep) setWizardStep(index);
+      });
+    });
+    document.querySelectorAll('[data-edit-step]').forEach(button => {
+      button.addEventListener('click', () => setWizardStep(Number(button.dataset.editStep)));
+    });
+    calcForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (currentWizardStep < wizardStages.length - 1) advanceWizard();
+      else runCalc();
+    });
+    calcForm.addEventListener('input', event => {
+      event.target.closest('.field')?.classList.remove('invalid');
+      if ($('result').classList.contains('shown')) {
+        ['result', 'phases-section', 'leveltable-section'].forEach(id => $(id).classList.remove('shown'));
+      }
+    });
 
     // Read one numeric field; returns the parsed Number or null if blank / non-finite.
     // Bound checks against the input's min/max attributes are respected.
@@ -959,8 +1572,10 @@
             <span class="stat-value">${result.breakdown.mpWash > 0 ? `lvl ${p.mpWashFirstLevel}` : 'Not needed'}</span>
           </div>
           <div class="stat-line">
-            <span class="stat-label">${input.classData.isMage ? 'MP Wash ends at' : 'Swap Level'}</span>
-            <span class="stat-value">lvl ${p.mpWashStop}</span>
+            <span class="stat-label">${input.classData.isMage ? 'Stale HP Wash starts at' : 'Swap Level'}</span>
+            <span class="stat-value">${input.classData.isMage
+              ? (p.staleHPWashStartLevel === null ? 'Not needed' : `lvl ${p.staleHPWashStartLevel}`)
+              : `lvl ${p.mpWashStop}`}</span>
           </div>
           ${input.classData.isMage ? '' : `
           <div class="stat-line">
@@ -1127,6 +1742,9 @@
     function showResult(input, result) {
       setCalcRunning(false);
       renderResult(input, result);
+      requestAnimationFrame(() => {
+        $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     }
 
     // Payload sent across the worker boundary. `classData` is deliberately excluded: it holds
@@ -1208,11 +1826,11 @@
       }
       // Swap Level may equal Target Level (everything collapses at the goal level) but never exceed it,
       // and it cannot precede the character's current level.
-      if (input.goals.swapLevel > input.goals.targetLevel) {
+      if (!input.classData.isMage && input.goals.swapLevel > input.goals.targetLevel) {
         showFormError(`Swap Level (${input.goals.swapLevel}) cannot be greater than Target Level (${input.goals.targetLevel}).`);
         return;
       }
-      if (input.goals.swapLevel < input.currentState.level) {
+      if (!input.classData.isMage && input.goals.swapLevel < input.currentState.level) {
         showFormError(`Swap Level (${input.goals.swapLevel}) cannot be lower than Current Level (${input.currentState.level}).`);
         return;
       }
@@ -1234,7 +1852,13 @@
     function syncSwapVisibility() {
       const classData = CLASSES[classSelect.value];
       const isMage = classData.isMage;
-      $('f-swap-level').hidden = isMage;
+      const swapField = $('f-swap-level');
+      const swapInput = $('i-swap-level');
+      swapField.hidden = isMage;
+      swapField.setAttribute('aria-hidden', String(isMage));
+      // Hidden alone removes the field visually; disabled also removes it from keyboard/form
+      // interaction so Magicians genuinely have no Swap Level option.
+      swapInput.disabled = isMage;
       $('i-swap-level-hint').textContent = isMage
         ? ''
         : 'Playable from here — MP Wash stops and Base INT resets to your Main Stat.';
@@ -1242,6 +1866,8 @@
       $('i-first-job-hint').textContent = requirement
         ? `First job: lvl ${requirement.level} with at least ${requirement.minimum} ${requirement.stat}. These AP stay permanently allocated.`
         : 'Beginner has no job-advancement stat requirement.';
+      $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 5';
+      if (currentWizardStep === wizardStages.length - 1) updateReview();
     }
 
     classSelect.addEventListener('change', syncSwapVisibility);
@@ -1255,6 +1881,7 @@
     });
 
     syncSwapVisibility();
+    setWizardStep(0, false);
   </script>
 </body>
 </html>
