@@ -10,7 +10,7 @@ from the interface and exercised directly through a Node.js test suite.
 
 ## Engineering highlights
 
-- Searches over Target Base INT, MP Wash Start Level, and an internal transition from MP Wash to pre-Swap Fresh HP Wash; non-Mages still choose their Swap Level, while the Magician cap level remains optimized.
+- Searches non-Mage Target Base INT and wash transitions; non-Mages choose their Swap Level, while Magicians keep every fresh AP in INT and the calculator optimizes when MP washing and stale HP washing begin.
 - Supports fresh characters and partially progressed characters across 11 classes.
 - Models first-job Base Stat requirements, class-specific HP/MP gains, minimum HP/MP constraints,
   gear INT, Maple Warrior, fresh and stale HP washing, and the Magician MP-cap strategy.

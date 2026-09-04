@@ -220,12 +220,20 @@ const CLASSES = {
     // (net wash 56-58 at base INT 480 ⟹ base ≈ 38). Matches the +20 used for naturalMP level-ups.
     freshAPMPBase: 38,
     mpLossPerReset: 30,
+    // Krythan distinguishes the 1st-job and post-2nd-job Mage MP floors.
+    beginnerMinMPFormula: (L) => 10 * L - 5,
+    firstJobMinMPFormula: (L) => 22 * L - 1,
     minMPFormula: (L) => 22 * L + 449,
     minHPFormula: (L) => 10 * L + 64,
     maxHPBonusPerLevel: 0,
     maxHPActivatesAt: null,
     maxMPBonusPerLevel: 20,
-    maxMPActivatesAt: 16,
+    // Krythan's Projection sheet applies a 30-MP correction for the early levels before
+    // Improved MaxMP Increase is complete. Spread that correction over levels 9-11 so the
+    // level table and analytical totals stay aligned; the full +20 applies from level 12.
+    partialMaxMPBonusPerLevel: 10,
+    partialMaxMPStartsAt: 9,
+    maxMPActivatesAt: 12,
     jaBonuses: [
       { level: 8, hp: 0, mp: 125 },
       { level: 30, hp: 0, mp: 475 },

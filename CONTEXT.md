@@ -73,7 +73,7 @@ Allocate 1 fresh AP → HP at level-up; the HP gain is the higher "Fresh AP HP" 
 AP Reset `-MP +HP` — directly converts existing MP into HP at the (slightly lower) Stale AP HP rate for the class. One **AP Reset** per HP point gained. Can be scheduled either **during Phase 3** (combinable with **Fresh HP Wash** at the same level — both drain MP, both add HP) or as a **cleanup burst at Target Level** to top up the HP Goal. Mid-flight Stale HP Wash is the lever that lets the plan convert MP earlier and still reach **HP Goal** when peak MP would otherwise blow the 30k cap.
 
 **MP-Cap HP Wash**:
-The Magician HP-wash endgame. Once MP reaches the goal (typically the 30k cap), the player holds MP there: each level they allocate fresh AP → MP and immediately `-MP +HP` stale-wash all of that level's MP inflow (fresh AP gain + natural level-up + INT/10) back down, so MP never exceeds the cap and the inflow becomes HP. Distinct from ordinary **Stale HP Wash** (which drains existing MP *downward*) — here MP is *pinned* and the continuous inflow is what's converted. Dominant for Magicians because their **Fresh HP Wash** rate is tiny (≈8 HP/AP) while a high-**Base INT** Mage's per-AP MP generation converts to far more HP. Source: Krythan's mage sheet + Shivering's "Comprehensive Guide to HP/MP Washing on Mages". Non-Mage classes don't use it (their Fresh HP Wash dominates).
+The Magician HP-wash endgame. Once MP reaches the goal (typically the 30k cap), the player holds MP there: each level they allocate fresh AP → MP, use `-MP +INT` to complete the MP Wash and preserve their INT growth, then use additional `-MP +HP` stale washes to convert the net MP inflow (MP-wash profit + natural level-up + INT/10) into HP. Distinct from ordinary **Stale HP Wash** (which drains existing MP *downward*) — here MP is *pinned* and the continuous inflow is what's converted. Dominant for Magicians because their **Fresh HP Wash** rate is tiny (≈8 HP/AP) while a high-**Base INT** Mage's per-AP MP generation converts to far more HP. Source: Krythan's mage sheet + Shivering's "Comprehensive Guide to HP/MP Washing on Mages". Non-Mage classes don't use it (their Fresh HP Wash dominates).
 _Avoid_: overflow wash, cap wash (informal)
 
 **MP Wash Start Level**:
@@ -86,7 +86,7 @@ _Avoid_: level to swap, MP Wash Stop Level, reset level
 Magicians have no **Swap Level** — their **Main Stat** *is* INT, so they are playable throughout and never reset **Base INT**. Their plan is driven by the **MP Goal** alone.
 
 **Target Base INT**:
-The peak **Base INT** the calculator decides the user should build up to. Reached at or before **Swap Level** and sustained until then. Reset back to **Main Stat** at **Swap Level**.
+For non-Mages, the peak **Base INT** the calculator decides to build, sustain until **Swap Level**, and then reset into **Main Stat**. For Magicians, this is simply their projected final INT at **Target Level**: every fresh AP ultimately returns to INT, so there is no chosen INT plateau or reset.
 
 **Pre-Swap Fresh HP Wash**:
 An optimizer-controlled suffix between **MP Wash** and **Swap Level**. **Base INT** remains at **Target Base INT**, preserving its level-up MP contribution. Fresh AP in this suffix go to HP and are paired with `-MP +MainStat` **AP Resets**. The transition level may split its AP between MP Wash and Fresh HP Wash; this avoids rounding a legal one-to-four-AP boundary up to a whole level. Compared with continuing **MP Wash**, the reset count is unchanged, but the character trades fresh-AP MP generation for the class's larger Fresh AP HP gain. The user does not supply this boundary.
@@ -98,7 +98,7 @@ _Avoid_: fresh wash toggle, HP wash mode
 **Phase Plan**:
 The level-banded sequence of allocation strategies the calculator outputs. Two shapes:
 - **Non-Mage:** *(optional)* pre-game **Shift to INT** → satisfy the **First Job Requirement** → build **Base INT** → *(optional)* build **Main Stat** while retaining INT → *(optional)* **MP Wash** → *(optional)* **Pre-Swap Fresh HP Wash** while retaining INT → reset **Base INT** to **Main Stat** at **Swap Level** → *(optional)* **Post-Swap Fresh HP Wash** → *(optional)* cleanup **Stale HP Wash** at **Target Level**.
-- **Mage:** *(optional)* pre-game **Shift to INT** → satisfy the 20 INT **First Job Requirement** as part of building **Base INT** → **MP Wash** (drive MP to the goal) → **MP-Cap HP Wash** (hold MP at the goal, convert inflow to HP) to **Target Level**. **Magicians skip the Base-INT reset** because INT is already their Main Stat.
+- **Mage:** *(optional)* pre-game **Shift to INT** → satisfy the 20 INT **First Job Requirement** as part of building **Base INT** → **MP Wash** (`+MP`, then `-MP +INT`) →, once the MP goal is reached, continue MP Washing while **MP-Cap HP Washing** the net inflow (`-MP +HP`) to **Target Level**. **Magicians skip the Base-INT reset** because INT is already their Main Stat.
 
 The pre-game Shift to INT can draw from any eligible non-INT stats (STR/DEX/LUK) above their permanent minimums — the player picks the source.
 
@@ -113,7 +113,7 @@ The calculator's job is to find the **Phase Plan** that minimises total **AP Res
 - Level to reset **Base INT** → **Main Stat** = **Swap Level** (superseded — see ADR 0001; it was previously locked to **Target Level** on the mistaken rationale that there was no benefit to resetting early).
 
 **Search space (calculator decides):**
-- **Target Base INT**
+- **Target Base INT** for non-Mages; a Mage's final Base INT is determined by its current INT, eligible Shift to INT, and all remaining fresh AP
 - **MP Wash Start Level**
 - **Pre-Swap Fresh HP Wash Start Level** (equivalently, the internal end of **MP Wash**). This is optimizer-controlled and not a user input.
 - The exact count of post-Swap **Fresh HP Washes**, frontloaded at up to 5 per level after **Swap Level**, plus any **Stale HP Wash** needed to absorb MP or finish the **HP Goal**
@@ -123,7 +123,7 @@ The calculator's job is to find the **Phase Plan** that minimises total **AP Res
 
 When the calculator runs successfully:
 
-1. **Summary card** — `Target Base INT`, `MP Wash Start Level`, **Swap Level**, `HP at Swap Level`, total **AP Resets**, **NX Cost** (= AP Resets × 3,100), **Days-to-Wash** (= NX Cost ÷ 6,500 NX-per-day-per-account), plus a one-line per-reset-type breakdown.
+1. **Summary card** — `Target Base INT`, `MP Wash Start Level`, total **AP Resets**, **NX Cost** (= AP Resets × 3,100), **Days-to-Wash** (= NX Cost ÷ 6,500 NX-per-day-per-account), plus a one-line per-reset-type breakdown. Non-Mages also show **Swap Level** and `HP at Swap Level`; Magicians instead show when **Stale HP Wash** starts.
 2. **Phase Plan** — level-banded allocation guide (e.g. "Lvl 4-67 · All fresh AP → INT") matching the **Search space** decisions.
 3. **Level-by-level table** — 8 columns: Level, HP, MP, Base INT, **Main Stat**, Phase, AP Resets this level, Cumulative AP Resets. **Main Stat** sits beside **Base INT** so the swap is visible: **Base INT** collapses to its starting value at **Swap Level** while **Main Stat** climbs to absorb it. Collapsed by default. The Phase column shows one of: *Build Base INT* / *MP Wash* / *Pre-Swap Fresh HP Wash* / *Fresh HP Wash* / *Stale HP Wash* / *Fresh + Stale HP Wash* / *Fresh HP Wash + Reset INT* / *Fresh + Stale HP Wash + Reset INT* / *MP-Cap HP Wash* (Mage endgame) / *Build &lt;Main Stat&gt;* / *Reset Base INT* / *Stale HP Wash + Reset INT* / *Done*.
 

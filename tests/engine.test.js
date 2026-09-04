@@ -37,6 +37,7 @@ const exportList = [
   'minMPAtLevel', 'minHPAtLevel', 'prepareInputs',
   'runPhase1', 'runPhase2', 'runPhase3', 'runCleanup',
   'washCycleMP', 'freshHPWashYield', 'staleHPWashYield', 'washCycleMPCost',
+  'naturalMPGainAtLevel',
   'freshAPAtLevel', 'freshAPInRange', 'firstJobAPNeeded',
   'firstJobRequirementAPAtLevel', 'usableFreshAPAtLevel', 'usableFreshAPInRange',
 ];
@@ -172,6 +173,17 @@ describe('Reference cases (Krythan-aligned)', () => {
     assertTrue(r.finalHP >= 5000, 'HP meets goal');
     assertTrue(r.finalMP >= 10000, 'MP meets goal');
     assertEq(r.breakdown.intReset, 0, 'Mages do not reset INT');
+  });
+
+  test('Magician result is independent of any submitted Swap Level', () => {
+    const early = plan({ class: 'Magician', goals: { hpGoal: 5000, mpGoal: 10000, targetLevel: 180, swapLevel: 2 } });
+    const late = plan({ class: 'Magician', goals: { hpGoal: 5000, mpGoal: 10000, targetLevel: 180, swapLevel: 200 } });
+    assertFeasible(early);
+    assertFeasible(late);
+    assertEq(early.apResets, late.apResets);
+    assertEq(early.finalHP, late.finalHP);
+    assertEq(early.finalMP, late.finalMP);
+    assertEq(early.params.targetBaseInt, late.params.targetBaseInt);
   });
 });
 
@@ -411,6 +423,19 @@ describe('phasePlan output shape', () => {
     const phaseNames = phases.map(p => p.phase);
     assertTrue(!phaseNames.includes('Reset Base INT'), 'Mages should not Reset Base INT');
   });
+
+  test('Magician uses the correct pre-2nd-job MP floor', () => {
+    assertEq(mod.minMPAtLevel(CLASSES.Magician, 20), 22 * 20 - 1,
+      '1st-job Mage minimum MP');
+    assertEq(mod.minMPAtLevel(CLASSES.Magician, 30), 22 * 30 + 449,
+      '2nd-job Mage minimum MP');
+  });
+
+  test('Magician early MaxMP correction matches Krythan projection', () => {
+    assertEq(mod.naturalMPGainAtLevel(CLASSES.Magician, 9), 33);
+    assertEq(mod.naturalMPGainAtLevel(CLASSES.Magician, 11), 33);
+    assertEq(mod.naturalMPGainAtLevel(CLASSES.Magician, 12), 43);
+  });
 });
 
 describe('levelTable output', () => {
@@ -614,6 +639,18 @@ describe('Phase steps in isolation', () => {
     assertEq(p2.intResetsInPhase2, 0, 'INT already at target');
     assertEq(p2.phase2PlateauLevels, 145 - 60, 'all Phase 2 is plateau');
   });
+  test('Mage MP-wash start level AP is not also counted in the INT-build phase', () => {
+    const cur = { level: 1, hp: 50, mp: 5, str: 4, dex: 4, luk: 4, baseInt: 13 };
+    const params = { mpWashStart: 70, mpWashStop: 131, shift: 0, targetBaseInt: 918 };
+    const p1 = mod.runPhase1(CLASSES.Magician, cur, params, 40, 1.0);
+    assertEq(p1.phase1EndInt, 353,
+      'level 70 fresh/advancement AP belongs only to the MP-wash phase');
+    const p2 = mod.runPhase2(CLASSES.Magician, params, p1, 40, 1.0, cur);
+    assertEq(p2.phase2APResets, 320,
+      'levels 70-131 supply 320 fresh AP before a boundary split');
+    assertEq(p2.phase2EndInt, 673,
+      'all washed AP return to INT exactly once');
+  });
   test('runPhase3 with both fresh and stale wash combines yields', () => {
     const params = { mpWashStop: 145, targetBaseInt: 300, phase3FreshHPResets: 105, staleHPPerLevelPhase3: 2 };
     const goals = { hpGoal: 30000, mpGoal: 5000, targetLevel: 180 };
@@ -704,6 +741,25 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
     const b = r.breakdown;
     assertEq(b.intReset, 0, 'Mage never resets INT');
     assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash);
+  });
+  test('Post-cap fresh AP is MP-washed back into INT and counted as resets', () => {
+    const r = plan({ class: 'Magician', goals: { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
+    assertFeasible(r);
+    const expectedPostCap = mod.usableFreshAPInRange(CLASSES.Magician, r.__state,
+      r.params.mpWashStop, r.__goals.targetLevel);
+    assertEq(r.params.phase3MPWashResets, expectedPostCap,
+      'every post-cap fresh AP is restored to INT');
+    assertEq(r.breakdown.mpWash,
+      r.params.phase2MPWashResets + r.params.phase3MPWashResets,
+      'MP Wash breakdown includes both sides of the cap transition');
+    const rows = levelTable(CLASSES.Magician, r.__state, r.__goals, 40, 1.0, r);
+    const last = rows.at(-1);
+    assertEq(last.baseInt, r.__state.baseInt + r.breakdown.shift
+      + mod.usableFreshAPInRange(CLASSES.Magician, r.__state,
+        r.__state.level, r.__goals.targetLevel),
+    'all fresh AP and any pre-game shift finish in INT');
+    assertEq(last.cumulativeResets, r.apResets,
+      'level table schedules every Mage reset');
   });
   test('Cap-wash level table final row reconciles with summary (±1% tolerance)', () => {
     const r = plan({ class: 'Magician', goals: { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
@@ -1190,6 +1246,12 @@ describe('UI calculation trigger', () => {
       'runCalc should only appear in its declaration and the form submit handler');
     assertTrue(indexSrc.includes("classSelect.addEventListener('change', syncSwapVisibility);"),
       'changing class should still update class-specific field visibility');
+    assertTrue(indexSrc.includes('swapInput.disabled = isMage;'),
+      'Mage selection removes Swap Level from form and keyboard interaction');
+    assertTrue(indexSrc.includes('.field[hidden] { display: none !important; }'),
+      'the field layout rule cannot visually override hidden class-specific fields');
+    assertTrue(indexSrc.includes("swapField.setAttribute('aria-hidden', String(isMage));"),
+      'Mage selection removes Swap Level from the accessibility tree');
     assertTrue(/id="i-cur-int"[^>]*value="13"/.test(indexSrc),
       'the fresh-character defaults use the 13 INT MapleLegends starting roll');
     assertTrue(indexSrc.includes('id="i-first-job-hint"'),
