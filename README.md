@@ -8,6 +8,12 @@ of AP Resets required.
 The project is a dependency-free JavaScript application. Its calculation engine is kept separate
 from the interface and exercised directly through a Node.js test suite.
 
+The interface guides you through your character, goals, gear and a labelled review. Results show
+projected HP/MP against your goals, the total NX and AP Reset cost, and an estimate of the time
+needed to save that NX. Key levels lead into a numbered plan; the cost breakdown, washing-term
+guide and full level table expand when you need more detail. The layout adapts to mobile, with
+keyboard navigation and support for reduced motion.
+
 ## Engineering highlights
 
 - Searches non-Mage Target Base INT and wash transitions; non-Mages choose their Swap Level, while Magicians keep every fresh AP in INT and the calculator optimizes when MP washing and stale HP washing begin.

@@ -211,10 +211,12 @@
     .clamp-notice:empty { display: none; }
     .clamp-notice li {
       color: var(--text-2);
-      font-family: 'Fraunces', serif;
       font-size: 14px;
-      font-style: italic;
-      padding: 4px 0;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border-left: 3px solid var(--amber);
+      border-radius: 4px;
+      margin-top: 8px;
     }
     .clamp-note .arr { font-style: normal; margin-right: 4px; opacity: 0.7; }
 
@@ -306,12 +308,14 @@
     .form-error[hidden] { display: none; }
 
     .result {
+      display: none;
       opacity: 0;
       visibility: hidden;  /* hide from accessibility tree until populated */
       transform: translateY(8px);
       transition: opacity 0.5s ease, transform 0.5s ease;
     }
     .result.shown {
+      display: block;
       opacity: 1;
       visibility: visible;
       transform: translateY(0);
@@ -319,152 +323,225 @@
 
     .summary-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0 48px;
-      margin-bottom: 40px;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 20px;
     }
-    .stat-line {
+    .result-header {
       display: flex;
-      align-items: baseline;
+      align-items: flex-start;
       justify-content: space-between;
-      padding: 16px 0;
-      border-bottom: 1px solid var(--line-soft);
-      gap: 24px;
+      gap: 20px;
+      margin-bottom: 28px;
     }
-    .stat-label {
-      font-family: 'Fraunces', serif;
-      font-style: italic;
-      font-weight: 400;
-      font-size: 17px;
-      color: var(--text);
-      letter-spacing: -0.005em;
-    }
-    .stat-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 500;
-      font-size: 22px;
-      color: var(--text);
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
-    }
-    .stat-value.feature {
-      font-family: 'Fraunces', serif;
-      font-weight: 400;
-      font-size: 32px;
-      font-variation-settings: 'opsz' 60;
-      color: var(--amber);
-      letter-spacing: -0.02em;
-    }
-    .stat-value.feature .unit {
-      font-family: 'Inter Tight', sans-serif;
-      font-weight: 500;
-      font-size: 12.5px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-2);
-      margin-left: 8px;
-      vertical-align: 4px;
-    }
-
-    .breakdown { margin-top: 32px; }
-    .breakdown-title {
-      font-family: 'Fraunces', serif;
-      font-style: italic;
-      font-weight: 400;
-      font-size: 17px;
-      color: var(--text);
-      margin-bottom: 14px;
-    }
-    .breakdown-rows { display: grid; gap: 6px; }
-    .br-row {
-      display: grid;
-      grid-template-columns: 90px 150px 1fr;
-      gap: 18px;
-      align-items: baseline;
-      padding: 8px 0;
-      border-bottom: 1px dotted var(--line-soft);
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .br-count {
-      text-align: right;
+    .result-eyebrow {
+      color: var(--moss);
+      font-size: 12px;
       font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .result-heading {
+      font-family: 'Fraunces', serif;
+      font-weight: 400;
+      font-size: clamp(28px, 3vw, 36px);
+      line-height: 1.2;
+      letter-spacing: -.02em;
+    }
+    .result-context, .section-intro {
+      color: var(--text-mute);
       font-size: 15px;
-      font-variant-numeric: tabular-nums;
-      color: var(--text);
+      margin-top: 8px;
+      line-height: 1.6;
     }
-    .br-op { color: var(--maple); font-size: 13px; font-weight: 500; }
-    .br-desc {
-      font-family: 'Inter Tight', sans-serif;
-      font-weight: 400;
+    .section-intro { margin-bottom: 24px; max-width: 70ch; }
+    .result-edit {
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
       color: var(--text-2);
-      font-size: 14.5px;
+      padding: 10px 16px;
+      min-height: 44px;
+      font: 500 14px 'Inter Tight', sans-serif;
+      cursor: pointer;
+    }
+    .result-edit:hover { border-color: var(--moss); color: var(--moss); }
+    .result :focus-visible { outline: 2px solid var(--moss); outline-offset: 4px; }
+    .outcome-card, .cost-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .outcome-card { background: #edf3e9; border-color: #cfddc8; }
+    .cost-card { background: var(--surface-2); }
+    .outcome-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .metric-heading, .result-subheading {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .goal-badge { color: var(--moss); font-size: 13px; font-weight: 600; }
+    .outcome-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 22px;
+    }
+    .metric-label { font-size: 14px; color: var(--text-2); }
+    .metric-value {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(26px, 2.8vw, 38px);
+      font-weight: 500;
+      letter-spacing: -.06em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.4;
+      color: var(--moss);
+      margin: 4px 0;
+    }
+    .metric-note {
+      display: block;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-mute);
+    }
+    .goal-margin { display: block; color: var(--moss); font-size: 13px; margin-top: 5px; }
+    .cost-value { color: var(--amber); font-size: clamp(25px, 2.5vw, 34px); }
+    .metric-unit { font: 500 14px 'Inter Tight', sans-serif; letter-spacing: 0; margin-left: 6px; }
+    .cost-details {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+    .cost-detail-value { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .cost-assumption { margin: 12px 0 0; }
+    .milestones { margin-top: 28px; }
+    .milestone-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+      margin-top: 16px;
+    }
+    .milestone { border-left: 2px solid var(--line); padding-left: 14px; }
+    .milestone-value {
+      display: block;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 600;
+      margin: 3px 0;
+      font-variant-numeric: tabular-nums;
     }
 
-    .phases { display: grid; gap: 16px; }
-    .phase {
+    .breakdown { margin-top: 28px; border-top: 1px solid var(--line-soft); }
+    .details-toggle {
+      cursor: pointer;
+      padding: 18px 0 4px;
+      color: var(--text-2);
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .details-toggle::marker { color: var(--moss); }
+    .details-toggle:hover { color: var(--moss); }
+    .breakdown-intro { margin: 16px 0 8px; }
+    .br-row, .breakdown-total {
       display: grid;
-      grid-template-columns: 170px 1fr;
-      gap: 28px;
-      padding: 14px 0;
+      grid-template-columns: minmax(0, 1fr) 90px 120px;
+      gap: 18px;
+      align-items: center;
+      padding: 12px 0;
       border-bottom: 1px solid var(--line-soft);
     }
-    .phase-range {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 13.5px;
-      color: var(--maple);
+    .breakdown-head { font-size: 12px; color: var(--text-mute); }
+    .br-number {
+      text-align: right;
       font-variant-numeric: tabular-nums;
-      padding-top: 2px;
+      font-size: 14px;
+      font-weight: 500;
     }
-    .phase-body {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+    .breakdown-head span:not(:first-child) { text-align: right; }
+    .br-op { display: block; color: var(--text-mute); font: 12px 'JetBrains Mono', monospace; margin-top: 5px; }
+    .br-desc { font-size: 15px; color: var(--text); }
+    .breakdown-total { border: 0; font-size: 14px; font-weight: 600; }
+
+    .phases { list-style: none; margin-top: 24px; }
+    .phase { position: relative; padding: 0 0 26px 54px; }
+    .phase:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      bottom: 0;
+      left: 17px;
+      border-left: 1px solid var(--line);
     }
-    .phase-name {
-      font-family: 'Inter Tight', sans-serif;
-      font-size: 10.5px;
+    .phase:last-child { padding-bottom: 0; }
+    .phase-number {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--moss);
+      font-size: 15px;
       font-weight: 600;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-2);
+      display: grid;
+      place-items: center;
     }
-    .phase-action {
-      font-family: 'Inter Tight', sans-serif;
-      font-weight: 400;
-      font-size: 15.5px;
-      color: var(--text);
-      line-height: 1.5;
-      letter-spacing: 0;
+    .phase-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; padding-top: 3px; }
+    .phase-range {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--moss);
+      background: #edf3e9;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-variant-numeric: tabular-nums;
     }
+    .phase-name { font-size: 18px; font-weight: 600; line-height: 1.4; }
+    .phase-action { font-size: 15px; line-height: 1.7; color: var(--text-2); margin-top: 10px; max-width: 82ch; }
+    ol.phase-action { padding-left: 22px; }
+    .phase-action li { padding-left: 4px; margin-top: 6px; }
+    .phase-action li::marker { color: var(--text-mute); font-size: 12px; }
+    .ap-operation { color: var(--text); font-weight: 600; }
+    .notation-guide { border-top: 1px solid var(--line-soft); margin-top: 26px; }
+    .notation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+    .notation-grid dt { font-weight: 600; font-size: 14px; }
+    .notation-grid dd { font-size: 14px; color: var(--text-mute); margin-top: 5px; line-height: 1.6; }
 
     .leveltable-toggle {
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 12px;
       color: var(--text-2);
-      font-family: 'Inter Tight', sans-serif;
-      font-size: 11.5px;
-      font-weight: 500;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      background: none;
-      border: 0;
-      padding: 8px 0;
+      font: 500 15px 'Inter Tight', sans-serif;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      width: 100%;
+      text-align: left;
       user-select: none;
-      transition: color 0.2s ease;
     }
-    .leveltable-toggle:hover { color: var(--maple); }
-    .leveltable-toggle .triangle {
-      font-size: 9px;
-      transition: transform 0.25s ease;
-    }
+    .leveltable-toggle:hover { color: var(--moss); border-color: var(--moss); }
+    .leveltable-toggle .triangle { font-size: 10px; transition: transform 0.25s ease; }
     .leveltable-toggle.open .triangle { transform: rotate(90deg); }
     .leveltable-toggle .count {
-      color: var(--text-faint);
-      font-family: 'JetBrains Mono', monospace;
-      letter-spacing: 0;
+      margin-left: auto;
+      color: var(--text-mute);
+      font-size: 13px;
+      text-align: right;
     }
     /* `.review-row` sets `display: flex`, which beats the UA sheet's `[hidden] { display: none }`
        at equal specificity — without this the Magician Swap Level row stays visible. */
@@ -480,9 +557,11 @@
       overflow-x: auto;
       max-height: 560px;
       border: 1px solid var(--line-soft);
+      border-radius: 8px;
     }
     table.lt {
       width: 100%;
+      min-width: 860px;
       border-collapse: collapse;
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
@@ -494,9 +573,8 @@
       background: var(--surface);
       color: var(--text-2);
       font-family: 'Inter Tight', sans-serif;
-      font-size: 10.5px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
+      font-size: 12px;
+      text-transform: capitalize;
       font-weight: 600;
       text-align: right;
       padding: 12px 14px;
@@ -504,6 +582,10 @@
     }
     table.lt thead th:first-child,
     table.lt thead th.phase-col { text-align: left; }
+    table.lt thead th { z-index: 1; }
+    table.lt th:first-child, table.lt td:first-child { position: sticky; left: 0; background: var(--surface); }
+    table.lt thead th:first-child { z-index: 2; background: var(--surface-2); }
+    table.lt caption { text-align: left; padding: 12px 14px; font: 14px 'Inter Tight', sans-serif; color: var(--text-mute); }
     table.lt td {
       padding: 8px 14px;
       text-align: right;
@@ -520,6 +602,7 @@
     }
     table.lt tr.boundary td { color: var(--maple); border-bottom-color: var(--maple-glow); }
     table.lt tr.boundary td.phase-col { color: var(--maple); font-weight: 500; }
+    table.lt tr.target-row td { background: #edf3e9; color: var(--moss); font-weight: 600; }
     table.lt tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
     .infeas {
@@ -563,11 +646,7 @@
     @media (max-width: 720px) {
       .frame { padding: 40px 20px 64px; }
       .wordmark { font-size: 36px; }
-      .summary-grid { grid-template-columns: 1fr; gap: 0; }
-      .phase { grid-template-columns: 1fr; gap: 8px; }
-      .br-row { grid-template-columns: 70px 110px 1fr; gap: 12px; }
       .calc-row { flex-direction: column; align-items: stretch; }
-      .stat-value.feature { font-size: 26px; }
     }
 
     /* Maple Field Guide wizard */
@@ -598,46 +677,48 @@
     }
 
     .frame {
-      width: min(100%, 1440px);
+      width: min(100%, 1280px);
       max-width: none;
-      padding: 34px 54px 52px;
+      padding: 32px 40px 48px;
     }
 
-    .site-header { margin-bottom: 30px; }
-    .head { align-items: center; gap: 16px; margin-bottom: 2px; }
-    .mark { width: 38px; height: 38px; transform: none; }
+    .site-header { display: flex; justify-content: space-between; align-items: center; gap: 28px; margin-bottom: 32px; padding-bottom: 26px; border-bottom: 1px solid var(--line-soft); }
+    .head { align-items: center; gap: 10px; margin-bottom: 4px; }
+    .mark { width: 30px; height: 30px; transform: none; }
     .mark path { fill: none; stroke: var(--maple); stroke-width: 1.35; }
-    .wordmark { color: var(--text); font-size: clamp(38px, 4vw, 52px); }
+    .wordmark { color: var(--text); font-size: 36px; }
     .meta-line {
-      color: var(--text-2);
-      font-family: 'Fraunces', serif;
-      font-size: 17px;
+      color: var(--text-mute);
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 14px;
       letter-spacing: 0;
-      margin: 0 0 0 54px;
+      margin: 0 0 0 40px;
       text-transform: none;
     }
+    .header-note { color: var(--text-2); font-size: 14px; line-height: 1.7; max-width: 260px; padding-left: 20px; border-left: 2px solid var(--line); }
+    .header-note strong { color: var(--moss); font-weight: 600; display: block; }
 
     .wizard-layout {
       display: grid;
-      grid-template-columns: 250px minmax(0, 1fr);
-      gap: 34px;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 28px;
       align-items: start;
     }
 
     .wizard-progress {
-      padding: 26px 0 20px;
+      padding: 20px 0;
       position: sticky;
       top: 18px;
     }
     .wizard-progress ol { list-style: none; }
-    .step-item { position: relative; min-height: 116px; }
-    .step-item:last-child { min-height: 56px; }
+    .step-item { position: relative; min-height: 100px; }
+    .step-item:last-child { min-height: 48px; }
     .step-item:not(:last-child)::after {
       content: '';
       position: absolute;
       z-index: 0;
-      left: 27px;
-      top: 54px;
+      left: 23px;
+      top: 48px;
       bottom: 0;
       width: 1px;
       background: var(--line);
@@ -651,8 +732,8 @@
       color: inherit;
       cursor: pointer;
       display: grid;
-      grid-template-columns: 56px minmax(0, 1fr);
-      gap: 18px;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 14px;
       padding: 0;
       text-align: left;
       width: 100%;
@@ -662,49 +743,50 @@
     .step-dot {
       align-items: center;
       background: var(--bg);
-      border: 1px solid #837b6f;
+      border: 1px solid var(--line);
       border-radius: 50%;
       display: flex;
-      font-family: 'Fraunces', serif;
-      font-size: 25px;
-      height: 56px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 18px;
+      height: 48px;
       justify-content: center;
       position: relative;
       transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
-      width: 56px;
+      width: 48px;
       z-index: 1;
     }
-    .step-item.active .step-dot { border: 2px solid var(--maple); color: var(--maple); }
-    .step-item.complete .step-dot { border: 2px solid var(--moss); color: var(--moss); }
-    .step-check { display: none; font-family: 'Inter Tight', sans-serif; font-size: 27px; font-weight: 500; }
+    .step-item.active .step-dot { border-color: var(--moss); color: var(--surface); background: var(--moss); box-shadow: 0 0 0 5px rgba(15, 85, 54, .06); }
+    .step-item.complete .step-dot { border-color: #b9cdb5; color: var(--moss); background: #edf3e9; }
+    .step-check { display: none; font-family: 'Inter Tight', sans-serif; font-size: 21px; font-weight: 500; }
     .step-item.complete .step-number { display: none; }
     .step-item.complete .step-check { display: block; }
-    .step-copy { padding-top: 8px; }
-    .step-name { display: block; font-family: 'Fraunces', serif; font-size: 22px; line-height: 1.2; }
-    .step-detail { color: var(--text-mute); display: block; font-size: 14px; margin-top: 7px; }
-    .step-item.active .step-detail { color: var(--maple); }
+    .step-copy { padding-top: 3px; }
+    .step-name { display: block; font-size: 17px; font-weight: 500; line-height: 1.4; }
+    .step-detail { color: var(--text-mute); display: block; font-size: 13px; margin-top: 4px; }
+    .step-item.active .step-name { color: var(--moss); font-weight: 600; }
+    .step-item.active .step-detail { color: var(--moss); }
     .step-item.complete .step-detail { color: var(--moss); }
 
     .wizard-card {
       background: rgba(255, 253, 248, 0.74);
-      border: 1px solid #bcae99;
-      border-radius: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
       box-shadow: var(--shadow);
       min-height: 0;
       overflow: hidden;
-      padding: clamp(34px, 5vw, 62px);
+      padding: 36px;
       position: relative;
-    }
-    .wizard-card::after {
-      color: #ad9f8a;
-      content: '\2733';
-      font-size: 33px;
-      opacity: 0.7;
-      position: absolute;
-      right: 28px;
-      top: 24px;
+      scroll-margin-top: 20px;
     }
     .wizard-card form { min-height: 490px; display: flex; flex-direction: column; }
+    .stage-kicker { font-size: 12px; font-weight: 600; color: var(--moss); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+    .stage-description { color: var(--text-mute); font-size: 15px; line-height: 1.65; margin-top: 12px; max-width: 60ch; }
+    .field-group { border: 0; min-width: 0; }
+    .field-group legend { font-size: 14px; font-weight: 600; color: var(--text-2); margin-bottom: 16px; }
+    .field-hint { font-size: 13px; color: var(--text-mute); line-height: 1.55; }
+    .form-tip { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 16px 18px; margin-top: 24px; font-size: 14px; line-height: 1.65; color: var(--text-2); }
+    .form-tip strong { display: block; font-weight: 600; color: var(--moss); margin-bottom: 4px; }
+    button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--moss); outline-offset: 4px; }
     .wizard-stage { animation: stage-in 300ms cubic-bezier(.2,.8,.2,1); display: none; }
     .wizard-stage.active { display: block; }
     @keyframes stage-in {
@@ -722,8 +804,8 @@
       margin: 0;
     }
     .stage-body { margin-top: 26px; }
-    .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 44px; }
-    .field-stack { align-content: start; display: grid; gap: 22px; }
+    .pair-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 28px; }
+    .field-stack { align-content: start; display: grid; gap: 18px; }
 
     .wizard-card .field { border: 0; display: flex; padding: 0; }
     .wizard-card .field[hidden] { display: none !important; }
@@ -735,7 +817,7 @@
       margin: 0;
       text-transform: none;
     }
-    .wizard-card .field:focus-within label { color: var(--maple); }
+    .wizard-card .field:focus-within label { color: var(--moss); }
     .wizard-card .field input {
       appearance: textfield;
       background: rgba(255, 255, 255, .72);
@@ -743,9 +825,9 @@
       border-radius: 8px;
       color: var(--text);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 500;
-      min-height: 58px;
+      min-height: 52px;
       outline: none;
       padding: 12px 16px;
       transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
@@ -756,8 +838,8 @@
     .wizard-card .field input:hover { border-color: #8d8172; }
     .wizard-card .field input:focus {
       background: #fffefa;
-      border-color: var(--maple);
-      box-shadow: 0 0 0 3px var(--maple-glow);
+      border-color: var(--moss);
+      box-shadow: 0 0 0 3px rgba(15, 85, 54, .1);
     }
     .wizard-card .field.invalid input { border-color: var(--maple); }
     /* The native select is kept as the value store and form control; .listbox below is the UI,
@@ -773,12 +855,12 @@
       color: var(--text);
       cursor: pointer;
       display: flex;
-      font-family: 'Fraunces', serif;
-      font-size: 20px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 18px;
       font-weight: 500;
       gap: 12px;
       justify-content: space-between;
-      min-height: 58px;
+      min-height: 52px;
       outline: none;
       padding: 12px 16px;
       text-align: left;
@@ -786,11 +868,12 @@
       width: 100%;
     }
     .listbox-button:hover { border-color: #8d8172; }
+    .listbox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .listbox-button:focus-visible,
     .listbox-button[aria-expanded="true"] {
       background: #fffefa;
-      border-color: var(--maple);
-      box-shadow: 0 0 0 3px var(--maple-glow);
+      border-color: var(--moss);
+      box-shadow: 0 0 0 3px rgba(15, 85, 54, .1);
     }
     .field.invalid .listbox-button { border-color: var(--maple); }
     .listbox-icon {
@@ -825,36 +908,36 @@
       border-radius: 7px;
       color: var(--text);
       cursor: pointer;
-      font-family: 'Fraunces', serif;
-      font-size: 18px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 16px;
       padding: 9px 12px;
     }
-    .listbox-option[data-active="true"] { background: var(--maple-glow); }
-    .listbox-option[aria-selected="true"] { background: var(--maple); color: #fffefa; }
+    .listbox-option[data-active="true"] { background: #edf3e9; }
+    .listbox-option[aria-selected="true"] { background: var(--moss); color: #fffefa; }
 
     .card-field { gap: 10px; }
     .card-field .clamp-note { color: var(--text-mute); font-size: 12px; }
+    .card-field .clamp-note:empty { display: none; }
 
-    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 44px; }
-    .review-group { border-top: 1px solid var(--line); padding-top: 16px; }
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .review-group { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; padding: 18px; min-width: 0; }
     .review-group-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 12px; }
-    .review-group h3 { color: var(--moss); font-family: 'Fraunces', serif; font-size: 20px; font-weight: 500; }
+    .review-group h3 { color: var(--moss); font-size: 16px; font-weight: 600; }
     .review-edit {
       background: transparent;
       border: 0;
       border-bottom: 1px solid var(--line);
       color: var(--text-2);
       cursor: pointer;
-      font: 600 11px 'Inter Tight', sans-serif;
-      letter-spacing: .12em;
-      padding: 2px 0;
-      text-transform: uppercase;
+      font: 500 13px 'Inter Tight', sans-serif;
+      padding: 8px 4px;
+      min-width: 44px;
     }
-    .review-edit:hover { border-color: var(--maple); color: var(--maple); }
+    .review-edit:hover { border-color: var(--moss); color: var(--moss); }
     .review-list { display: grid; gap: 8px; }
     .review-row { align-items: baseline; display: flex; flex-wrap: wrap; gap: 2px 14px; justify-content: space-between; }
     .review-label { color: var(--text-mute); font-size: 13px; white-space: nowrap; }
-    .review-value { color: var(--text); flex: 1 1 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; min-width: 0; text-align: right; }
+    .review-value { color: var(--text); flex: 1 1 auto; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 0; text-align: right; }
 
     .wizard-footer { margin-top: auto; padding-top: 42px; }
     .form-error {
@@ -872,8 +955,9 @@
       border-radius: 6px;
       cursor: pointer;
       display: inline-flex;
-      font-family: 'Fraunces', serif;
-      font-size: 19px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
       gap: 14px;
       justify-content: center;
       min-height: 54px;
@@ -884,14 +968,14 @@
     .btn-back:hover { border-color: var(--text-2); transform: translateX(-2px); }
     .btn-back[hidden] { display: none; }
     .btn-next, .btn-calc {
-      background: linear-gradient(135deg, #9a6718, #82550e);
-      border: 1px solid #6d470b;
-      box-shadow: 0 8px 18px rgba(147, 95, 22, .16);
+      background: var(--moss);
+      border: 1px solid var(--moss);
+      box-shadow: 0 4px 12px rgba(15, 85, 54, .1);
       color: #fffdf8;
       margin-left: auto;
-      min-width: 220px;
+      min-width: 180px;
     }
-    .btn-next:hover, .btn-calc:hover { background: linear-gradient(135deg, #8c5d14, #744b0c); box-shadow: 0 11px 24px rgba(147, 95, 22, .23); transform: translateY(-1px); }
+    .btn-next:hover, .btn-calc:hover { background: #093e27; box-shadow: 0 6px 16px rgba(15, 85, 54, .16); transform: translateY(-1px); }
     .btn-calc[hidden], .btn-next[hidden] { display: none; }
     .btn-calc[disabled] { cursor: progress; opacity: .6; }
     .calc-progress { color: var(--text-mute); justify-content: flex-end; margin-top: 12px; }
@@ -901,12 +985,12 @@
       background: rgba(255, 253, 248, .72);
       border: 1px solid var(--line);
       border-radius: 14px;
-      margin: 42px 0 0 284px;
+      margin: 28px 0 0;
       padding: 36px 44px;
+      scroll-margin-top: 24px;
     }
     .result .section-title { color: var(--text-2); }
     .result .section-rule { background: var(--line-soft); }
-    .stat-value.feature { color: var(--amber); }
     table.lt thead th { background: var(--surface-2); }
     table.lt tr:hover td { background: rgba(201, 147, 53, .06); }
     .footer { color: var(--text-mute); margin-top: 58px; }
@@ -914,36 +998,42 @@
 
     @media (max-width: 980px) {
       .frame { padding-inline: 30px; }
-      .wizard-layout { grid-template-columns: 205px minmax(0, 1fr); gap: 24px; }
-      .step-button { gap: 12px; }
-      .step-name { font-size: 19px; }
-      .result.section { margin-left: 229px; }
+      .wizard-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+      .wizard-progress { position: static; padding: 0; }
+      .wizard-progress ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .step-item, .step-item:last-child { min-height: 0; }
+      .step-item:not(:last-child)::after { top: 20px; height: 1px; left: calc(50% + 24px); right: calc(-50% + 24px); width: auto; bottom: auto; }
+      .step-button { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+      .step-dot { width: 40px; height: 40px; font-size: 16px; }
+      .step-name { font-size: 14px; }
+      .step-copy { padding: 0; }
+      .step-detail { display: none; }
+      .result.section { padding: 28px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .milestone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 700px) {
       .frame { padding: 22px 14px 40px; }
-      .site-header { margin-bottom: 20px; padding-left: 4px; }
+      .site-header { margin-bottom: 24px; padding: 0 4px 20px; }
+      .header-note { display: none; }
       .head { align-items: flex-start; gap: 9px; }
       .mark { height: 28px; margin-top: 5px; width: 28px; }
       .wordmark { font-size: 31px; }
-      .meta-line { font-size: 14px; margin-left: 38px; }
-      .wizard-layout { grid-template-columns: 48px minmax(0, 1fr); gap: 9px; }
-      .wizard-progress { padding-top: 18px; }
-      .step-item { min-height: 84px; }
-      .step-item:last-child { min-height: 42px; }
-      .step-item:not(:last-child)::after { left: 20px; top: 42px; }
-      .step-button { display: block; }
-      .step-dot { font-size: 19px; height: 42px; width: 42px; }
-      .step-check { font-size: 21px; }
-      .step-copy { display: none; }
-      .wizard-card { border-radius: 12px; min-height: 0; padding: 34px 18px 24px; }
-      .wizard-card::after { font-size: 24px; right: 14px; top: 12px; }
+      .meta-line { font-size: 13px; margin-left: 38px; }
+      .step-name { font-size: 12px; }
+      .wizard-card { border-radius: 12px; min-height: 0; padding: 24px 20px; }
       .wizard-card form { min-height: 0; }
       .stage-heading { font-size: 26px; }
       .stage-body { margin-top: 18px; }
-      .review-grid { grid-template-columns: 1fr; gap: 30px; }
+      .review-grid { grid-template-columns: 1fr; gap: 14px; }
       .pair-grid { gap: 14px 12px; }
       .field-stack { gap: 14px; }
+      .character-grid { grid-template-columns: 1fr; gap: 24px; }
+      .character-grid .field-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .field-group legend { margin-bottom: 12px; }
+      .stage-description { font-size: 14px; }
+      .field-hint { font-size: 12px; }
       .wizard-card .field input, .listbox-button { font-size: 17px; min-height: 52px; padding: 10px 12px; }
       .listbox-option { font-size: 16px; padding: 8px 10px; }
       .wizard-footer { padding-top: 32px; }
@@ -953,10 +1043,25 @@
       .btn-back { flex: 0 0 auto; }
       .btn-next, .btn-calc { flex: 1; }
       .result.section { margin-left: 0; padding: 24px 18px; }
-      .summary-grid { grid-template-columns: 1fr; }
-      .br-row { grid-template-columns: 56px 92px 1fr; gap: 8px; }
-      .phase { grid-template-columns: 1fr; gap: 6px; }
+      .result-header { flex-wrap: wrap; gap: 14px; }
+      .outcome-card, .cost-card { padding: 18px; }
+      .outcome-stats { gap: 12px; }
+      .metric-value { font-size: 29px; }
+      .milestone-grid { gap: 22px 14px; }
+      .br-row, .breakdown-total { grid-template-columns: minmax(0, 1fr) 54px 80px; gap: 10px; }
+      .br-number { font-size: 13px; }
+      .phase { padding-left: 44px; }
+      .phase-heading { flex-direction: column; gap: 8px; }
+      .phase-name { font-size: 17px; }
+      .notation-grid { grid-template-columns: 1fr; }
       .footer { font-size: 12px; }
+    }
+    @media (max-width: 380px) {
+      .goals-grid, .gear-grid { grid-template-columns: 1fr; }
+      .milestone-grid { grid-template-columns: 1fr; }
+      .metric-value { font-size: 25px; }
+      .outcome-stats { gap: 8px; }
+      .br-row, .breakdown-total { column-gap: 6px; }
     }
   </style>
 </head>
@@ -964,6 +1069,7 @@
   <main class="frame">
 
     <header class="site-header">
+      <div>
       <div class="head">
         <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
           <path d="M16 2 L19 9 L26 8 L22 14 L28 18 L21 19 L22 26 L16 22 L10 26 L11 19 L4 18 L10 14 L6 8 L13 9 Z"/>
@@ -971,6 +1077,8 @@
         <h1 class="wordmark">Maple<span class="em-w">Washer</span></h1>
       </div>
       <div class="meta-line">MapleLegends washing calculator</div>
+      </div>
+      <p class="header-note"><strong>A clear plan for your character.</strong>See the stats, steps and AP Resets needed to reach your goals.</p>
     </header>
 
     <div class="wizard-layout">
@@ -1005,28 +1113,35 @@
 
       <section class="wizard-card" aria-label="Wash plan builder">
         <form id="calc-form" novalidate>
+          <p class="stage-kicker" id="wizard-step-label">Step 1 of 4</p>
           <div class="wizard-stage active" data-stage="0">
-            <h2 class="stage-heading">Character</h2>
-            <div class="stage-body pair-grid">
-              <div class="field-stack">
+            <h2 class="stage-heading">Your character</h2>
+            <p class="stage-description" id="character-help">Enter your current max HP and MP, and your base stats without equipment or buffs. Starting fresh? The defaults are ready to use.</p>
+            <div class="stage-body pair-grid character-grid" aria-describedby="character-help">
+              <fieldset class="field-group">
+                <legend>Character details</legend>
+                <div class="field-stack">
                 <div class="field card-field">
                   <label for="i-class">Class</label>
                   <select id="i-class" required></select>
                 </div>
                 <div class="field card-field">
-                  <label for="i-cur-level">Level</label>
+                  <label for="i-cur-level">Current level</label>
                   <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
                 </div>
                 <div class="field card-field">
-                  <label for="i-cur-hp">HP</label>
+                  <label for="i-cur-hp">Current max HP</label>
                   <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
                 </div>
                 <div class="field card-field">
-                  <label for="i-cur-mp">MP</label>
+                  <label for="i-cur-mp">Current max MP</label>
                   <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
                 </div>
-              </div>
-              <div class="field-stack">
+                </div>
+              </fieldset>
+              <fieldset class="field-group">
+                <legend>Base stats · without gear</legend>
+                <div class="field-stack">
                 <div class="field card-field">
                   <label for="i-cur-str">STR</label>
                   <input id="i-cur-str" type="number" inputmode="numeric" min="4" max="9999" step="1" value="4" required>
@@ -1043,20 +1158,24 @@
                   <label for="i-cur-int">INT</label>
                   <input id="i-cur-int" type="number" inputmode="numeric" min="4" max="9999" step="1" value="13" required>
                 </div>
-              </div>
+                </div>
+              </fieldset>
             </div>
           </div>
 
           <div class="wizard-stage" data-stage="1" hidden>
-            <h2 class="stage-heading">Goals</h2>
-            <div class="stage-body pair-grid">
+            <h2 class="stage-heading">Set your goals</h2>
+            <p class="stage-description">Choose the HP and MP you want to reach, and the level you want to reach them by.</p>
+            <div class="stage-body pair-grid goals-grid">
               <div class="field card-field">
                 <label for="i-target-level">Target level</label>
-                <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" required>
+                <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" aria-describedby="target-help" required>
+                <span class="field-hint" id="target-help">Both goals should be met at this level.</span>
               </div>
               <div class="field card-field" id="f-swap-level">
                 <label for="i-swap-level">Swap level</label>
-                <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" required>
+                <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" aria-describedby="swap-help" required>
+                <span class="field-hint" id="swap-help">When you move Base INT into your Main Stat to focus on combat.</span>
               </div>
               <div class="field card-field">
                 <label for="i-hp-goal">HP goal</label>
@@ -1073,40 +1192,56 @@
 
           <div class="wizard-stage" data-stage="2" hidden>
             <h2 class="stage-heading">Gear &amp; buffs</h2>
-            <div class="stage-body pair-grid">
+            <p class="stage-description">Extra INT helps you gain more MP as you level. Use the gear and Maple Warrior buff you expect to have.</p>
+            <div class="stage-body pair-grid gear-grid">
               <div class="field card-field">
                 <label for="i-gear-int">INT Gear</label>
-                <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" required>
+                <input id="i-gear-int" type="number" inputmode="numeric" min="0" max="999" step="1" value="40" aria-describedby="gear-help" required>
+                <span class="field-hint" id="gear-help">Total INT from equipment only. Enter 0 if you have none.</span>
               </div>
               <div class="field card-field">
                 <label for="i-mw">Maple Warrior</label>
-                <select id="i-mw"></select>
+                <select id="i-mw" aria-describedby="mw-help"></select>
+                <span class="field-hint" id="mw-help">Choose the buff level you’ll use while levelling.</span>
               </div>
             </div>
+            <div class="form-tip"><strong>How your gear is used</strong>The plan assumes you wear this INT Gear from level 10 through your Target Level.</div>
           </div>
 
           <div class="wizard-stage" data-stage="3" hidden>
-            <h2 class="stage-heading" tabindex="-1">Review</h2>
+            <h2 class="stage-heading" tabindex="-1">Ready to calculate?</h2>
+            <p class="stage-description">Check your setup below. We’ll find a plan that meets your goals and minimises AP Resets.</p>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
-                <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0">Edit</button></div>
+                <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0" aria-label="Edit character">Edit</button></div>
                 <div class="review-list">
                   <div class="review-row"><span class="review-label">Class</span><span class="review-value" data-review="class"></span></div>
-                  <div class="review-row"><span class="review-label">Level · HP · MP</span><span class="review-value" data-review="current"></span></div>
-                  <div class="review-row"><span class="review-label">STR · DEX · LUK · INT</span><span class="review-value" data-review="stats"></span></div>
+                  <div class="review-row"><span class="review-label">Current level</span><span class="review-value" data-review="current-level"></span></div>
+                  <div class="review-row"><span class="review-label">Current max HP</span><span class="review-value" data-review="current-hp"></span></div>
+                  <div class="review-row"><span class="review-label">Current max MP</span><span class="review-value" data-review="current-mp"></span></div>
+                </div>
+              </section>
+              <section class="review-group">
+                <div class="review-group-head"><h3>Base stats</h3><button class="review-edit" type="button" data-edit-step="0" aria-label="Edit base stats">Edit</button></div>
+                <div class="review-list" data-review="stats">
+                  <div class="review-row"><span class="review-label">STR</span><span class="review-value" data-review="str"></span></div>
+                  <div class="review-row"><span class="review-label">DEX</span><span class="review-value" data-review="dex"></span></div>
+                  <div class="review-row"><span class="review-label">LUK</span><span class="review-value" data-review="luk"></span></div>
+                  <div class="review-row"><span class="review-label">INT</span><span class="review-value" data-review="int"></span></div>
                   <div class="review-row"><span class="review-label">Non-INT pool</span><span class="review-value" data-review="pool"></span></div>
                 </div>
               </section>
               <section class="review-group">
-                <div class="review-group-head"><h3>Goals</h3><button class="review-edit" type="button" data-edit-step="1">Edit</button></div>
+                <div class="review-group-head"><h3>Goals</h3><button class="review-edit" type="button" data-edit-step="1" aria-label="Edit goals">Edit</button></div>
                 <div class="review-list">
                   <div class="review-row"><span class="review-label">Target level</span><span class="review-value" data-review="target-level"></span></div>
-                  <div class="review-row"><span class="review-label">HP · MP goals</span><span class="review-value" data-review="goals"></span></div>
+                  <div class="review-row"><span class="review-label">HP Goal</span><span class="review-value" data-review="hp-goal"></span></div>
+                  <div class="review-row"><span class="review-label">MP Goal</span><span class="review-value" data-review="mp-goal"></span></div>
                   <div class="review-row" id="review-swap-row"><span class="review-label">Swap level</span><span class="review-value" data-review="swap"></span></div>
                 </div>
               </section>
               <section class="review-group">
-                <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="2">Edit</button></div>
+                <div class="review-group-head"><h3>Gear &amp; buffs</h3><button class="review-edit" type="button" data-edit-step="2" aria-label="Edit gear and buffs">Edit</button></div>
                 <div class="review-list">
                   <div class="review-row"><span class="review-label">INT Gear</span><span class="review-value" data-review="gear"></span></div>
                   <div class="review-row"><span class="review-label">Maple Warrior</span><span class="review-value" data-review="mw"></span></div>
@@ -1131,11 +1266,14 @@
       </section>
     </div>
 
-    <section class="section result" id="result">
-      <div class="section-head">
-        <span class="section-num">ii.</span>
-        <h2 class="section-title">the plan</h2>
-        <span class="section-rule"></span>
+    <section class="section result" id="result" aria-labelledby="result-title">
+      <div class="result-header">
+        <div>
+          <p class="result-eyebrow">Your results</p>
+          <h2 class="result-heading" id="result-title" tabindex="-1">Your washing plan</h2>
+          <p class="result-context" id="result-context"></p>
+        </div>
+        <button class="result-edit" id="edit-result-goals" type="button">Edit goals <span aria-hidden="true">↗</span></button>
       </div>
 
       <div id="infeas-block" role="alert" aria-live="assertive"></div>
@@ -1145,49 +1283,61 @@
       <div id="summary-block">
         <div class="summary-grid" id="summary-grid"></div>
 
-        <div class="breakdown">
-          <div class="breakdown-title">— AP Reset breakdown</div>
-          <div class="breakdown-rows" id="breakdown-rows"></div>
+        <div class="milestones">
+          <h3 class="result-subheading">Key levels &amp; INT</h3>
+          <dl class="milestone-grid" id="milestone-grid"></dl>
         </div>
+
+        <details class="breakdown" id="reset-breakdown">
+          <summary class="details-toggle">Where the AP Resets go</summary>
+          <p class="metric-note breakdown-intro">Each AP Reset moves one AP between stats. The costs below add up to your total.</p>
+          <div class="br-row breakdown-head" aria-hidden="true"><span>Purpose</span><span>AP Resets</span><span>NX</span></div>
+          <div class="breakdown-rows" id="breakdown-rows"></div>
+          <div class="breakdown-total" id="breakdown-total"></div>
+        </details>
       </div>
     </section>
 
-    <section class="section result" id="phases-section">
-      <div class="section-head">
-        <span class="section-num">iii.</span>
-        <h2 class="section-title">phases</h2>
-        <span class="section-rule"></span>
-      </div>
-      <div class="phases" id="phases-list"></div>
+    <section class="section result" id="phases-section" aria-labelledby="phases-title">
+      <h2 class="result-heading" id="phases-title">Your plan, step by step</h2>
+      <p class="section-intro">Follow the level ranges below. When a step has several actions, complete them in the order shown.</p>
+      <ol class="phases" id="phases-list"></ol>
+      <details class="notation-guide">
+        <summary class="details-toggle">A quick guide to AP &amp; washing terms</summary>
+        <dl class="notation-grid">
+          <div><dt>Fresh AP</dt><dd>New AP earned from levelling or job advancement. Allocating it does not cost an AP Reset.</dd></div>
+          <div><dt>AP Reset notation</dt><dd>The minus is the stat you remove from; the plus is the stat you add to. For example, −MP +HP moves one AP from MP to HP.</dd></div>
+          <div><dt>Fresh vs. Stale HP Wash</dt><dd>A Fresh HP Wash puts new AP into HP, paired with an AP Reset from MP to your Main Stat. A Stale HP Wash uses an AP Reset directly from MP to HP.</dd></div>
+          <div><dt>HP/MP Pool</dt><dd>AP you have placed into HP or MP. Keep the AP specified in your plan in this pool until the listed washes are complete.</dd></div>
+        </dl>
+      </details>
     </section>
 
-    <section class="section result" id="leveltable-section">
-      <div class="section-head">
-        <span class="section-num">iv.</span>
-        <h2 class="section-title">level by level</h2>
-        <span class="section-rule"></span>
-      </div>
+    <section class="section result" id="leveltable-section" aria-labelledby="leveltable-title">
+      <h2 class="result-heading" id="leveltable-title">Check each level</h2>
+      <p class="section-intro" id="leveltable-description">Your projected stats and AP Reset count after each level’s actions. Highlighted rows mark a phase change; the green row is your Target Level. Scroll across to see every column.</p>
 
       <button class="leveltable-toggle" id="leveltable-toggle" type="button"
               aria-expanded="false" aria-controls="leveltable">
-        <span class="triangle">▶</span>
+        <span class="triangle" aria-hidden="true">▶</span>
         <span class="ltlabel">Show full level table</span>
         <span class="count" id="leveltable-count"></span>
       </button>
 
       <div class="leveltable" id="leveltable">
-        <div class="leveltable-inner" hidden>
+        <div class="leveltable-inner" role="region" aria-label="Level-by-level projection" tabindex="0" hidden>
           <table class="lt" id="lt-table">
+            <caption>Non-INT Pool: STR, DEX and LUK AP available above their permanent minimums. Scroll across to see all columns.</caption>
             <thead>
               <tr>
-                <th scope="col">lvl</th>
-                <th scope="col">hp</th>
-                <th scope="col">mp</th>
-                <th scope="col">base int</th>
+                <th scope="col">Level</th>
+                <th scope="col">HP</th>
+                <th scope="col">MP</th>
+                <th scope="col">Base INT</th>
                 <th scope="col">non-int pool</th>
                 <th class="phase-col" scope="col">phase</th>
-                <th scope="col">resets / lvl</th>
-                <th scope="col">cumul. resets</th>
+                <th scope="col">AP Resets this level</th>
+                <th scope="col">Total AP Resets so far</th>
               </tr>
             </thead>
             <tbody id="lt-body"></tbody>
@@ -1242,6 +1392,7 @@
       button.setAttribute('role', 'combobox');
       button.setAttribute('aria-haspopup', 'listbox');
       button.setAttribute('aria-expanded', 'false');
+      if (select.hasAttribute('aria-describedby')) button.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
       const valueEl = document.createElement('span');
       valueEl.className = 'listbox-value';
       valueEl.id = select.id + '-value';
@@ -1279,6 +1430,7 @@
 
       function syncValue() {
         valueEl.textContent = select.options[select.selectedIndex]?.textContent ?? '';
+        button.title = valueEl.textContent;
       }
 
       function render() {
@@ -1437,8 +1589,11 @@
         if (el) el.textContent = value;
       };
       put('class', classSelect.value);
-      put('current', `${$('i-cur-level').value} · ${$('i-cur-hp').value}\u00a0HP · ${$('i-cur-mp').value}\u00a0MP`);
-      put('stats', `${$('i-cur-str').value} · ${$('i-cur-dex').value} · ${$('i-cur-luk').value} · ${$('i-cur-int').value}`);
+      const putField = (key, id) => { const value = readField(id); put(key, value === null ? '—' : fmt(value)); };
+      putField('current-level', 'i-cur-level');
+      putField('current-hp', 'i-cur-hp');
+      putField('current-mp', 'i-cur-mp');
+      for (const stat of ['str', 'dex', 'luk', 'int']) putField(stat, `i-cur-${stat}`);
       // Only the AP above the class floors can ever become INT, so the review shows the pool the
       // plan actually has to spend rather than leaving it to be worked out from the three stats.
       // Review can be opened while a stat is mid-edit (blank or a rejected value), and
@@ -1446,16 +1601,18 @@
       const poolStats = { str: readField('i-cur-str'), dex: readField('i-cur-dex'), luk: readField('i-cur-luk') };
       put('pool', Object.values(poolStats).some(v => v === null) ? '—'
         : nonIntPool(CLASSES[classSelect.value], poolStats));
-      put('target-level', $('i-target-level').value);
-      put('goals', `${$('i-hp-goal').value}\u00a0HP · ${$('i-mp-goal').value}\u00a0MP`);
-      put('swap', $('i-swap-level').value);
-      put('gear', $('i-gear-int').value);
+      putField('target-level', 'i-target-level');
+      putField('hp-goal', 'i-hp-goal');
+      putField('mp-goal', 'i-mp-goal');
+      putField('swap', 'i-swap-level');
+      putField('gear', 'i-gear-int');
       put('mw', mwSelect.options[mwSelect.selectedIndex]?.textContent || 'None');
       $('review-swap-row').hidden = CLASSES[classSelect.value].isMage;
     }
 
     function setWizardStep(nextStep, focusField = true) {
       currentWizardStep = Math.max(0, Math.min(wizardStages.length - 1, nextStep));
+      $('wizard-step-label').textContent = `Step ${currentWizardStep + 1} of ${wizardStages.length}`;
       if (currentWizardStep === wizardStages.length - 1) updateReview();
 
       wizardStages.forEach((stage, index) => {
@@ -1487,6 +1644,10 @@
           const firstControl = stage.querySelector(
             '.listbox-button:not([disabled]), input:not([disabled]), select:not([disabled])');
           (firstControl || stage.querySelector('.stage-heading'))?.focus({ preventScroll: true });
+          // Keep the stage title in view after moving on from a long mobile form.
+          if ($('wizard-step-label').getBoundingClientRect().top < 0) {
+            document.querySelector('.wizard-card').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+          }
         });
       }
     }
@@ -1558,6 +1719,7 @@
 
     $('btn-next').addEventListener('click', advanceWizard);
     $('btn-back').addEventListener('click', () => setWizardStep(currentWizardStep - 1));
+    $('edit-result-goals').addEventListener('click', () => setWizardStep(1));
     wizardSteps.forEach((step, index) => {
       step.querySelector('.step-button').addEventListener('click', () => {
         if (index <= furthestWizardStep) setWizardStep(index);
@@ -1665,36 +1827,31 @@
       else { el.hidden = true; }
       document.querySelectorAll('[aria-invalid="true"]').forEach(previous => {
         previous.removeAttribute('aria-invalid');
-        previous.removeAttribute('aria-describedby');
+        const remaining = (previous.getAttribute('aria-describedby') || '').split(/\s+/).filter(id => id && id !== 'form-error').join(' ');
+        if (remaining) previous.setAttribute('aria-describedby', remaining);
+        else previous.removeAttribute('aria-describedby');
       });
       if (msg && control) {
         control.setAttribute('aria-invalid', 'true');
-        control.setAttribute('aria-describedby', 'form-error');
+        control.setAttribute('aria-describedby', [control.getAttribute('aria-describedby'), 'form-error'].filter(Boolean).join(' '));
       }
     }
 
-    function animateNumber(el, start, end, duration = 700) {
-      const startTime = performance.now();
-      const tick = (t) => {
-        const elapsed = t - startTime;
-        const progress = Math.min(1, elapsed / duration);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const current = start + (end - start) * eased;
-        el.firstChild.textContent = fmt(Math.round(current)) + suffix;
-        if (progress < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      })[char]);
     }
 
     const opLabels = {
       // Shift source is the non-INT pool (player picks the stat); literal — no STAT substitution.
-      shift_up:   { op: '-Non-INT +INT', label: 'Mid-progress shift to INT (drawn from your non-INT pool)' },
-      shift_down: { op: '-INT +Main Stat', label: 'Mid-progress shift out of INT' },
+      shift_up:   { op: '-Non-INT +INT', label: 'Move existing stats into INT' },
+      shift_down: { op: '-INT +Main Stat', label: 'Move existing INT into your Main Stat' },
       // A Mage's Main Stat IS INT, so the generic STAT substitution renders "-MP +INT/INT".
-      mpWash:     { op: '-MP +INT/STAT', opMage: '-MP +INT', label: 'MP Wash cycles' },
+      mpWash:     { op: '-MP +INT/STAT', opMage: '-MP +INT', label: 'MP Wash' },
       phase3Fresh:{ op: '-MP +STAT', label: 'Fresh HP Wash' },
       intReset:   { op: '-INT +STAT', label: 'Reset Base INT' },
-      staleHPWash:{ op: '-MP +HP', label: 'Stale HP Wash (mid-flight + cleanup)' },
+      staleHPWash:{ op: '-MP +HP', label: 'Stale HP Wash' },
     };
 
     function renderResult(input, result) {
@@ -1703,12 +1860,16 @@
       const leveltableSection = $('leveltable-section');
 
       setLevelTableOpen(false);
+      $('reset-breakdown').open = false;
+      $('result-context').textContent = `${input.className} · Level ${input.currentState.level} → ${input.goals.targetLevel}`;
+      $('result-title').textContent = result.feasible ? 'Your washing plan' : 'Let’s adjust your goals';
 
       if (!result.feasible) {
         $('infeas-block').innerHTML = `
           <div class="infeas">
-            <div class="infeas-head">This plan is not reachable</div>
+            <h3 class="infeas-head">These goals aren’t reachable with this setup</h3>
             <div class="infeas-body"></div>
+            <p class="metric-note">Try a later Target Level or adjust your HP and MP Goals. Use “Edit goals” above to try another setup.</p>
           </div>
         `;
         $('infeas-block').querySelector('.infeas-body').textContent = result.reason;
@@ -1728,71 +1889,60 @@
       const isMage = input.classData.isMage;
       const nxCost = result.apResets * NX_PER_AP_RESET;
       const days = Math.ceil(nxCost / MAX_NX_PER_DAY_PER_ACCOUNT);
+      const savingTime = days >= 365
+        ? `About ${(days / 365).toLocaleString(undefined, { maximumFractionDigits: 1 })} years`
+        : days >= 60 ? `About ${(days / (365 / 12)).toLocaleString(undefined, { maximumFractionDigits: 1 })} months` : '';
 
       const mainStat = input.classData.mainStat;
-
-      const summaryHTML = `
+      const goalMetric = (stat, final, goal) => `
         <div>
-          <div class="stat-line">
-            <span class="stat-label">Target Base INT</span>
-            <span class="stat-value">${fmt(p.targetBaseInt)}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Start MP Wash at</span>
-            <span class="stat-value">${result.breakdown.mpWash > 0 && p.mpWashFirstLevel !== null
-              ? `lvl ${p.mpWashFirstLevel}` : 'Not needed'}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">${input.classData.isMage ? 'Stale HP Wash starts at' : 'Swap Level'}</span>
-            <span class="stat-value">${input.classData.isMage
-              ? (p.staleHPWashStartLevel === null ? 'Not needed' : `lvl ${p.staleHPWashStartLevel}`)
-              : `lvl ${p.mpWashStop}`}</span>
-          </div>
-          ${input.classData.isMage ? '' : `
-          <div class="stat-line">
-            <span class="stat-label">HP at Swap Level</span>
-            <span class="stat-value">${fmt(p.hpAtSwap)}</span>
-          </div>`}
-          <div class="stat-line">
-            <span class="stat-label">Final HP at lvl ${input.goals.targetLevel}</span>
-            <span class="stat-value">${fmt(result.finalHP)}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Final MP at lvl ${input.goals.targetLevel}</span>
-            <span class="stat-value">${fmt(result.finalMP)}</span>
-          </div>
-        </div>
-        <div>
-          <div class="stat-line">
-            <span class="stat-label">Total AP Resets</span>
-            <span class="stat-value feature" id="anim-ap">${fmt(result.apResets)}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">NX Cost</span>
-            <span class="stat-value feature" id="anim-nx">${fmt(nxCost)}<span class="unit">NX</span></span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Days at ${fmt(MAX_NX_PER_DAY_PER_ACCOUNT)} NX / day</span>
-            <span class="stat-value" id="anim-days">${fmt(days)}<span style="font-family:'Inter Tight'; font-size: 13px; color: var(--text-2); margin-left: 8px; font-weight: 400;">one account</span></span>
-          </div>
+          <dt class="metric-label">Final ${stat}</dt>
+          <dd><span class="metric-value">${fmt(final)}</span>
+            <span class="metric-note">${stat} Goal: ${fmt(goal)}</span>
+            <span class="goal-margin">${final > goal ? `${fmt(final - goal)} above your goal` : 'Goal reached'}</span>
+          </dd>
         </div>
       `;
-      $('summary-grid').innerHTML = summaryHTML;
+      $('summary-grid').innerHTML = `
+        <div class="outcome-card">
+          <div class="outcome-heading">
+            <h3 class="metric-heading">At level ${input.goals.targetLevel}</h3>
+            <span class="goal-badge"><span aria-hidden="true">✓</span> Both goals met</span>
+          </div>
+          <dl class="outcome-stats">
+            ${goalMetric('HP', result.finalHP, input.goals.hpGoal)}
+            ${goalMetric('MP', result.finalMP, input.goals.mpGoal)}
+          </dl>
+        </div>
+        <div class="cost-card">
+          <h3 class="metric-heading">Total cost</h3>
+          <p class="metric-value cost-value">${fmt(nxCost)} <span class="metric-unit">NX</span></p>
+          <dl class="cost-details">
+            <div><dt class="metric-label">AP Resets</dt><dd class="cost-detail-value">${fmt(result.apResets)}</dd></div>
+            <div><dt class="metric-label">Time to save NX</dt><dd class="cost-detail-value">${fmt(days)} ${days === 1 ? 'day' : 'days'}${savingTime ? `<span class="metric-note">${savingTime}</span>` : ''}</dd></div>
+          </dl>
+          <p class="metric-note cost-assumption">${result.apResets === 0
+            ? 'No AP Resets needed for these goals.'
+            : `${fmt(NX_PER_AP_RESET)} NX per AP Reset. Time assumes one account earning ${fmt(MAX_NX_PER_DAY_PER_ACCOUNT)} NX/day, starting from zero.`}</p>
+        </div>
+      `;
 
-      const apEl = $('anim-ap');
-      const nxEl = $('anim-nx');
-      const daysEl = $('anim-days');
-      // We need the leading text node for animation; ensure it's there.
-      if (apEl) {
-        apEl.firstChild ? animateNumber(apEl, 0, result.apResets) : (apEl.textContent = fmt(result.apResets));
-      }
-      if (nxEl) {
-        // nxEl has a unit child; animate the leading text node only
-        animateNumberText(nxEl, 0, nxCost);
-      }
-      if (daysEl) {
-        animateNumberText(daysEl, 0, days);
-      }
+      const milestones = [
+        [isMage ? 'Final Base INT' : 'Target Base INT', fmt(p.targetBaseInt),
+          isMage ? `At level ${input.goals.targetLevel}; INT remains your Main Stat.` : `Build to this amount and keep it until level ${p.mpWashStop}.`],
+        ['Start MP Wash', result.breakdown.mpWash > 0 && p.mpWashFirstLevel !== null ? `Level ${p.mpWashFirstLevel}` : 'Not needed',
+          result.breakdown.mpWash > 0 ? 'Use fresh AP to build extra MP.' : 'Your plan can reach its goals without MP Washing.'],
+        isMage
+          ? ['Start Stale HP Wash', p.staleHPWashStartLevel === null ? 'Not needed' : `Level ${p.staleHPWashStartLevel}`,
+            p.staleHPWashStartLevel === null ? 'No Stale HP Washing is needed.' : 'Begin converting extra MP into HP.']
+          : ['Swap Level', `Level ${p.mpWashStop}`, `Move your washing INT into ${mainStat}.`],
+      ];
+      if (!isMage) milestones.push(['HP at Swap Level', fmt(p.hpAtSwap), `Your projected HP at level ${p.mpWashStop}.`]);
+      $('milestone-grid').innerHTML = milestones.map(([label, value, note]) => `
+        <div class="milestone"><dt class="metric-label">${escapeHTML(label)}</dt>
+          <dd><span class="milestone-value">${escapeHTML(value)}</span><span class="metric-note">${escapeHTML(note)}</span></dd>
+        </div>
+      `).join('');
 
       // Filter to numeric reset-count keys; map `shift` to direction-specific meta.
       const breakdownEntries = Object.entries(result.breakdown)
@@ -1808,27 +1958,38 @@
         const op = (isMage && meta.opMage ? meta.opMage : meta.op).replace(/STAT/g, mainStat);
         return `
           <div class="br-row">
-            <span class="br-count">${fmt(count)}</span>
-            <span class="br-op">${op}</span>
-            <span class="br-desc">${meta.label}</span>
+            <div class="br-desc">${meta.label}<span class="br-op">${op}</span></div>
+            <span class="br-number" aria-label="${fmt(count)} AP Resets">${fmt(count)}</span>
+            <span class="br-number" aria-label="${fmt(count * NX_PER_AP_RESET)} NX">${fmt(count * NX_PER_AP_RESET)}</span>
           </div>
         `;
       }).join('');
-      $('breakdown-rows').innerHTML = breakdownHTML || '<div class="br-desc" style="font-family:Fraunces; font-style: italic;">— no AP Resets needed for this build</div>';
+      $('breakdown-rows').innerHTML = breakdownHTML || '<p class="metric-note">No AP Resets needed for this build.</p>';
+      $('breakdown-total').innerHTML = `<span>Total</span><span class="br-number" aria-label="${fmt(result.apResets)} AP Resets">${fmt(result.apResets)}</span><span class="br-number" aria-label="${fmt(nxCost)} NX">${fmt(nxCost)}</span>`;
 
       const phases = phasePlan(input.classData, input.currentState, input.goals, result);
-      $('phases-list').innerHTML = phases.map(ph => `
-        <div class="phase">
-          <div class="phase-range">${ph.range}</div>
-          <div class="phase-body">
-            <span class="phase-name">${ph.phase}</span>
-            <span class="phase-action">${ph.action.replace(/\+([A-Z]+)\b/g, '+<span style="color: var(--amber)">$1</span>')}</span>
-          </div>
-        </div>
-      `).join('');
+      $('phases-list').innerHTML = phases.map((ph, index) => {
+        // The engine's middle dots separate ordered actions. Keep the complete instructions,
+        // including any pool constraints, and split sentences for easier reading.
+        const actions = ph.action.split(/ · |(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean).map(action =>
+          escapeHTML(action).replace(/(-(?:Non-INT|INT|MP|HP) \+(?:Main Stat|(?:INT|STR|DEX|LUK|HP|MP)(?:\/(?:INT|STR|DEX|LUK))?)\b)/g,
+            '<strong class="ap-operation">$1</strong>'));
+        return `
+          <li class="phase">
+            <span class="phase-number" aria-hidden="true">${index + 1}</span>
+            <div class="phase-heading">
+              <span class="phase-range">${escapeHTML(ph.range.replace(/Lvl/g, 'Level'))}</span>
+              <h3 class="phase-name">${escapeHTML(ph.phase)}</h3>
+            </div>
+            ${actions.length > 1
+              ? `<ol class="phase-action">${actions.map(action => `<li>${action}</li>`).join('')}</ol>`
+              : `<p class="phase-action">${actions[0] || ''}</p>`}
+          </li>
+        `;
+      }).join('') || '<li class="metric-note">No further actions needed. Your current stats already meet these goals.</li>';
 
       const rows = levelTable(input.classData, input.currentState, input.goals, input.gearInt, input.mwMultiplier, result);
-      $('leveltable-count').textContent = `(${rows.length} levels)`;
+      $('leveltable-count').textContent = `${rows.length} ${rows.length === 1 ? 'level' : 'levels'}`;
       const phaseChangedSet = new Set();
       let prevPhase = null;
       rows.forEach(r => {
@@ -1836,7 +1997,7 @@
         prevPhase = r.phase;
       });
       const body = rows.map(r => {
-        const boundary = phaseChangedSet.has(r.level) ? 'boundary' : '';
+        const boundary = [phaseChangedSet.has(r.level) ? 'boundary' : '', r.level === input.goals.targetLevel ? 'target-row' : ''].join(' ');
         return `<tr class="${boundary}">
           <td>${r.level}</td>
           <td>${fmt(r.hp)}</td>
@@ -1844,7 +2005,7 @@
           <td>${fmt(r.baseInt)}</td>
           <td>${fmt(r.nonIntPool)}</td>
           <td class="phase-col">${r.phase}</td>
-          <td>${r.resetsThisLevel || ''}</td>
+          <td>${fmt(r.resetsThisLevel || 0)}</td>
           <td>${fmt(r.cumulativeResets)}</td>
         </tr>`;
       }).join('');
@@ -1853,25 +2014,6 @@
       resultSection.classList.add('shown');
       phasesSection.classList.add('shown');
       leveltableSection.classList.add('shown');
-    }
-
-    // Animates only the leading text node (preserves child .unit spans)
-    function animateNumberText(el, start, end, duration = 700) {
-      // ensure there's a leading text node
-      if (!el.firstChild || el.firstChild.nodeType !== Node.TEXT_NODE) {
-        el.insertBefore(document.createTextNode(''), el.firstChild);
-      }
-      const node = el.firstChild;
-      const startTime = performance.now();
-      const tick = (t) => {
-        const elapsed = t - startTime;
-        const progress = Math.min(1, elapsed / duration);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const current = start + (end - start) * eased;
-        node.textContent = fmt(Math.round(current));
-        if (progress < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
     }
 
     // ── Calculation transport ────────────────────────────────────────────────────────────────
@@ -1898,7 +2040,7 @@
       progress.classList.toggle('active', isRunning);
       bar.classList.remove('indeterminate');
       bar.style.width = '0%';
-      if (isRunning) $('calc-progress-label').textContent = 'Calculating…';
+      if (isRunning) $('calc-progress-label').textContent = 'Finding your plan…';
     }
 
     function setCalcProgress(completed, total) {
@@ -1907,7 +2049,7 @@
       const pct = Math.max(0, Math.min(100, (completed / total) * 100));
       bar.classList.remove('indeterminate');
       bar.style.width = pct + '%';
-      $('calc-progress-label').textContent = `Calculating… ${completed}/${total}`;
+      $('calc-progress-label').textContent = `Comparing plans… ${Math.round(pct)}%`;
     }
 
     function showResult(input, result) {
@@ -1915,7 +2057,8 @@
       showFormError(null);
       renderResult(input, result);
       requestAnimationFrame(() => {
-        $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('result-title').focus({ preventScroll: true });
+        $('result').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
       });
     }
 
