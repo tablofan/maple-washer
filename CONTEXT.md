@@ -105,7 +105,7 @@ The pre-game Shift to INT can draw from any eligible non-INT stats (STR/DEX/LUK)
 
 ## Calculator behavior
 
-The calculator's job is to find the **Phase Plan** that minimises total **AP Resets** subject to: `final HP ≥ HP Goal`, `final MP ≥ MP Goal`, and `MP ≥ Minimum MP` on every level that spends MP on a reset. **Minimum MP** and **Minimum HP** are post-2nd-job floors, so they are not enforced before the second job advancement — a level-1 character legitimately sits below the formula value. They are checked on reset-carrying levels rather than on every row because only a reset can push MP down; natural levelling only adds. See ADR 0001.
+The calculator's job is to find the **Phase Plan** that minimises total **AP Resets** subject to: `final HP ≥ HP Goal`, `final MP ≥ MP Goal`, and `MP ≥ Minimum MP` on every level that spends MP on a reset. **Minimum MP** and **Minimum HP** are post-2nd-job floors, so they are not enforced before the second job advancement — a level-1 character legitimately sits below the formula value. They are checked on reset-carrying levels rather than on every row because only a reset can push MP down. Note that this is not the same as saying no other row can sit below its floor: the floor **rises** with level, so a character whose Current MP is already under it (the engine deliberately does not clamp Current HP/MP — see `prepareInputs`) stays under it for the levels natural growth takes to catch up, with no reset involved. Those rows under-state MP against a game that would enforce the floor, so the model errs conservative. See ADR 0001.
 
 **Locked to Target Level (not optimization variables):**
 - Level to remove **INT Gear** = **Target Level** (wearing it longer only helps; removing it earlier costs MP gain).
