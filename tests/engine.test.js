@@ -809,15 +809,15 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
     assertFeasible(r);
     const b = r.breakdown;
     assertEq(b.intReset, 0, 'Mage never resets INT');
-    assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash);
+    assertEq(r.apResets, b.shift + b.mpWash + b.phase3Fresh + b.intReset + b.staleHPWash + (b.poolSeed || 0));
   });
   test('Post-cap fresh AP is MP-washed back into INT and counted as resets', () => {
     const r = plan({ class: 'Magician', goals: { hpGoal: 6000, mpGoal: 30000, targetLevel: 180 }, gearInt: 40 });
     assertFeasible(r);
     const expectedPostCap = mod.usableFreshAPInRange(CLASSES.Magician, r.__state,
-      r.params.mpWashStop, r.__goals.targetLevel);
+      r.params.mpWashStop, r.__goals.targetLevel - 1);
     assertEq(r.params.phase3MPWashResets, expectedPostCap,
-      'every post-cap fresh AP is restored to INT');
+      'post-cap AP is MP-washed except at the final level, where it goes directly to INT');
     assertEq(r.breakdown.mpWash,
       r.params.phase2MPWashResets + r.params.phase3MPWashResets,
       'MP Wash breakdown includes both sides of the cap transition');
@@ -840,6 +840,117 @@ describe('Mage MP-cap HP wash (Krythan endgame)', () => {
     // The old ±300 MP / ±2% HP slack would have hidden it; the measured delta is 0.
     assertEq(last.mp, r.finalMP, 'last row MP matches the summary');
     assertEq(last.hp, r.finalHP, 'last row HP matches the summary');
+  });
+});
+
+// Replay the displayed Mage AP actions independently of the cap evaluator. A real cap is
+// applied at EACH gain, and the HP/MP Pool must be open at EACH MP removal. Comparing the
+// replay with every displayed row catches MP that was clipped but later spent on HP.
+describe('Mage cap plans execute without imaginary MP', () => {
+  function replay(opts) {
+    const r = plan({ class: 'Magician', ...opts });
+    assertFeasible(r);
+    const state = r.__state, goals = r.__goals;
+    const rows = levelTable(CLASSES.Magician, state, goals, opts.gearInt ?? 40,
+      opts.mwMultiplier ?? 1, r);
+    let hp = state.hp, mp = state.mp, int = state.baseInt + r.breakdown.shift;
+    let resets = r.breakdown.shift;
+    for (const row of rows) {
+      const L = row.level;
+      let peak = mp;
+      const check = () => {
+        peak = Math.max(peak, mp);
+        assertTrue(mp <= 30000 && hp <= 30000, `level ${L}: actual stat cap`);
+        if (L > state.level && L < goals.targetLevel) {
+          if (goals.mpGoal === 30000) assertTrue(mp < 30000, `level ${L}: MP cap reached early`);
+          if (goals.hpGoal === 30000) assertTrue(hp < 30000, `level ${L}: HP cap reached early`);
+        }
+      };
+      if (L > state.level) {
+        hp = Math.min(30000, hp + (L <= 8 ? 14 : 12));
+        const natural = L <= 8 ? 11 : L < 12 ? 33 : 43;
+        mp = Math.min(30000, mp + natural
+          + Math.floor((int * (opts.mwMultiplier ?? 1) + (L >= 10 ? (opts.gearInt ?? 40) : 0)) / 10)
+          + (L === 8 ? 125 : L === 30 ? 475 : 0));
+        check();
+      }
+      let pool = 0;
+      const removeMP = () => {
+        assertTrue(pool > 0, `level ${L}: MP removal needs an AP in the pool`);
+        mp -= 30;
+        assertTrue(mp >= mod.minMPAtLevel(CLASSES.Magician, L), `level ${L}: minimum MP after reset`);
+        resets++;
+      };
+      const stale = () => {
+        for (let i = 0; i < row.staleHPWashesThisLevel; i++) {
+          removeMP();
+          hp = Math.min(30000, hp + 6);
+          check();
+        }
+      };
+      if (row.capSeed) {
+        int--; pool++; resets++;
+        hp = Math.min(30000, hp + 6);
+        check();
+        stale();
+        removeMP(); pool--; int++;
+        check();
+      }
+      for (let i = 0; i < row.mpWashesThisLevel; i++) {
+        mp = Math.min(30000, mp + 38 + Math.floor(int / 10));
+        pool++;
+        check();
+        if (i === row.mpWashesThisLevel - 1) stale();
+        removeMP(); pool--; int++;
+        check();
+      }
+      int += row.apAllocations.filter(a => a.to === 'INT').reduce((sum, a) => sum + a.count, 0);
+      assertEq(pool, 0, `level ${L}: all fresh AP restored to INT`);
+      assertEq(hp, row.hp, `level ${L}: HP matches executable actions`);
+      assertEq(mp, row.mp, `level ${L}: MP matches executable actions`);
+      assertEq(int, row.baseInt, `level ${L}: INT matches executable actions`);
+      assertEq(peak, row.peakMPThisLevel, `level ${L}: reported transient peak`);
+      assertEq(resets, row.cumulativeResets, `level ${L}: resets charged`);
+    }
+    assertEq(hp, r.finalHP, 'replayed HP matches summary');
+    assertEq(mp, r.finalMP, 'replayed MP matches summary');
+    assertEq(resets, r.apResets, 'replayed resets match summary');
+    return { r, rows };
+  }
+  for (const [hpGoal, mpGoal] of [[6000, 30000], [8000, 30000], [6000, 29900], [5000, 15000]]) {
+    test(`Fresh mage ${hpGoal} HP / ${mpGoal} MP obeys the cap after every action`, () => {
+      const { r, rows } = replay({ current: { baseInt: 13 },
+        goals: { hpGoal, mpGoal, targetLevel: 180 }, gearInt: 40 });
+      if (mpGoal === 30000) {
+        assertEq(rows.at(-1).mp, 30000);
+        assertEq(rows.at(-1).mpWashesThisLevel, 0, 'no reset drains target-level MP');
+        const phases = phasePlan(CLASSES.Magician, r.__state, r.__goals, r);
+        assertTrue(phases.some(p => p.phase === 'Reach MP goal' && /directly into INT/.test(p.action)),
+          'instructions explain the final level');
+        assertTrue(phases.some(p => /last paired reset pending/.test(p.action)),
+          'instructions keep the pool open for stale washes');
+      }
+    });
+  }
+  test('Already-capped mage makes room before levelling, with seed costs included', () => {
+    const { r, rows } = replay({ current: { level: 150, hp: 2000, mp: 30000, baseInt: 790 },
+      goals: { targetLevel: 151, hpGoal: 2024, mpGoal: 30000 }, gearInt: 70 });
+    assertTrue(rows[0].mp < 30000, 'preparation leaves room before the level-up');
+    assertEq(r.breakdown.poolSeed, 2, 'charge opening and closing an initially empty pool');
+    assertEq(rows.at(-1).mp, 30000);
+    assertTrue(phasePlan(CLASSES.Magician, r.__state, r.__goals, r)
+      .some(p => p.phase === 'Prepare MP headroom' && /-INT \+HP/.test(p.action)));
+  });
+  test('Mage HP reaches 30k only at target, with no washes wasted beyond the HP cap', () => {
+    const { rows } = replay({ current: { level: 150, hp: 29968, mp: 28000, baseInt: 790 },
+      goals: { targetLevel: 152, hpGoal: 30000, mpGoal: 27000 }, gearInt: 70 });
+    assertTrue(rows.find(row => row.level === 151).hp < 30000);
+    assertEq(rows.at(-1).hp, 30000);
+  });
+  test('The old one-level 2100 HP / 30k MP result cannot spend discarded MP', () => {
+    const r = plan({ class: 'Magician', current: { level: 150, hp: 2000, mp: 30000, baseInt: 790 },
+      goals: { targetLevel: 151, hpGoal: 2100, mpGoal: 30000 }, gearInt: 70 });
+    assertInfeasible(r);
   });
 });
 
@@ -946,16 +1057,14 @@ describe('Phase 3 stale-wash and peak MP cap', () => {
     assertEq(r.finalMP, 30000, 'final MP respects the cap');
   });
 
-  test('HP at Swap Level is clamped to 30,000', () => {
+  test('A 30k HP goal rejects natural growth that would reach the cap before target', () => {
     const r = plan({
       class: 'Fighter',
       current: { level: 160, hp: 29900, mp: 10000 },
       goals: { hpGoal: 30000, mpGoal: 1000, targetLevel: 180, swapLevel: 170 },
     });
-    assertFeasible(r);
-    assertEq(r.params.hpAtSwap, 30000, 'summary HP is capped');
-    const rows = levelTable(CLASSES['Fighter'], r.__state, r.__goals, 40, 1.0, r);
-    assertEq(rows.find(x => x.level === 170).hp, 30000, 'table HP matches summary at swap');
+    assertInfeasible(r, 'Natural HP growth reaches 30,000');
+    assertTrue(r.reason.includes('earlier Target Level'), 'explain how to make the target attainable');
   });
 
   test('Partial fresh-wash levels allocate remaining AP to Main Stat in the Phase Plan', () => {
@@ -1657,7 +1766,7 @@ describe('Level-table invariants across plans', () => {
     'Pre-Swap Fresh HP Wash', 'Fresh HP Wash', 'Fresh HP Wash + Reset INT',
     'Stale HP Wash', 'Stale HP Wash + Reset INT',
     'Fresh + Stale HP Wash', 'Fresh + Stale HP Wash + Reset INT',
-    'MP-Cap HP Wash', 'Reset Base INT', 'Done',
+    'MP-Cap HP Wash', 'Prepare MP headroom', 'Reach MP goal', 'Reset Base INT', 'Done',
   ]);
 
   const cases = [
@@ -1680,14 +1789,12 @@ describe('Level-table invariants across plans', () => {
         // Level-end values are hard-capped, always.
         assertTrue(row.hp <= 30000, `lvl ${row.level}: HP ${row.hp} over the 30k cap`);
         assertTrue(row.mp <= 30000, `lvl ${row.level}: MP ${row.mp} over the 30k cap`);
-        // The transient peak is capped too, EXCEPT in a cap-wash phase whose MP goal is itself
-        // 30,000: the model levels first and washes the excess down afterwards, where a player
-        // would wash down first and then level. Same MP generated, same washes, different order —
-        // so the peak reads a little over the cap. Bounded here at one level's worth of generation
-        // (measured max 717 across the Mage plans) so a real modelling runaway still fails.
-        const peakCap = r.params.capWash ? 31500 : 30000;
-        assertTrue(row.peakMPThisLevel <= peakCap,
-          `lvl ${row.level}: transient MP peak ${row.peakMPThisLevel} over ${peakCap}`);
+        assertTrue(row.peakMPThisLevel <= 30000,
+          `lvl ${row.level}: transient MP peak ${row.peakMPThisLevel} over 30000`);
+        if (row.level > r.__state.level && row.level < goals.targetLevel) {
+          if (goals.mpGoal === 30000) assertTrue(row.peakMPThisLevel < 30000, 'MP reaches the cap only at target');
+          if (goals.hpGoal === 30000) assertTrue(row.hp < 30000, 'HP reaches the cap only at target');
+        }
         // Minimum MP is a post-2nd-job floor and only a reset can push MP down.
         if (row.level >= secondJALevel && row.mpResetsThisLevel > 0) {
           const floor = mod.minMPAtLevel(CLASSES[className], row.level);

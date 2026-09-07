@@ -36,6 +36,10 @@ assert different facets of one fixture pay for it once.
 - **Engine invariants** — cumulative AP Resets monotone, HP monotone, the 30k
   HP/MP caps, the HP/MP Pool rule, and exact agreement between the summary
   numbers and the final row of the level table.
+- **Mage cap execution** — independently replay displayed allocations and resets,
+  applying caps after every gain and checking the pool before every MP removal.
+  Includes 30k goals reached only at target, near-cap goals, and preparation
+  for an already-capped character with all seed/reset costs included.
 - **Phase plan and level table shape** — phase ordering and vocabulary, the
   Base-INT collapse at the Swap Level, per-level AP splits, and the Non-INT pool
   column.
