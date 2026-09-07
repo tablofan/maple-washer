@@ -784,6 +784,36 @@
     .field-group { border: 0; min-width: 0; }
     .field-group legend { font-size: 14px; font-weight: 600; color: var(--text-2); margin-bottom: 16px; }
     .field-hint { font-size: 13px; color: var(--text-mute); line-height: 1.55; }
+    .field-label { display: flex; align-items: center; gap: 6px; }
+    .field-help {
+      display: inline-grid;
+      place-items: center;
+      flex: none;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--text-mute);
+      cursor: help;
+      font: 600 12px 'Inter Tight', sans-serif;
+    }
+    .field-help span { display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid currentColor; border-radius: 50%; }
+    .field-help:hover, .field-help:focus-visible { color: var(--moss); background: #edf3e9; }
+    .field-tooltip {
+      position: fixed;
+      z-index: 100;
+      width: 250px;
+      max-width: calc(100vw - 32px);
+      padding: 10px 12px;
+      border: 1px solid var(--moss);
+      border-radius: 8px;
+      background: var(--moss);
+      color: var(--surface);
+      box-shadow: 0 6px 20px rgba(46, 38, 28, .14);
+      font-size: 13px;
+      line-height: 1.6;
+    }
     .form-tip { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 16px 18px; margin-top: 24px; font-size: 14px; line-height: 1.65; color: var(--text-2); }
     .form-tip strong { display: block; font-weight: 600; color: var(--moss); margin-bottom: 4px; }
     button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--moss); outline-offset: 4px; }
@@ -1116,7 +1146,7 @@
           <p class="stage-kicker" id="wizard-step-label">Step 1 of 4</p>
           <div class="wizard-stage active" data-stage="0">
             <h2 class="stage-heading">Your character</h2>
-            <p class="stage-description" id="character-help">Enter your current max HP and MP, and your base stats without equipment or buffs. Starting fresh? The defaults are ready to use.</p>
+            <p class="stage-description" id="character-help">Enter your character’s current stats. Starting fresh? The defaults are ready to use.</p>
             <div class="stage-body pair-grid character-grid" aria-describedby="character-help">
               <fieldset class="field-group">
                 <legend>Character details</legend>
@@ -1130,12 +1160,20 @@
                   <input id="i-cur-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="1" required>
                 </div>
                 <div class="field card-field">
-                  <label for="i-cur-hp">Current max HP</label>
-                  <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" required>
+                  <div class="field-label">
+                    <label for="i-cur-hp">Current max HP</label>
+                    <button class="field-help" type="button" aria-label="About current max HP" aria-describedby="current-hp-tooltip" data-tooltip="current-hp-tooltip"><span aria-hidden="true">i</span></button>
+                    <span class="field-tooltip" id="current-hp-tooltip" role="tooltip" hidden>Base HP without equipment or buffs.</span>
+                  </div>
+                  <input id="i-cur-hp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="50" aria-describedby="current-hp-tooltip" required>
                 </div>
                 <div class="field card-field">
-                  <label for="i-cur-mp">Current max MP</label>
-                  <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" required>
+                  <div class="field-label">
+                    <label for="i-cur-mp">Current max MP</label>
+                    <button class="field-help" type="button" aria-label="About current max MP" aria-describedby="current-mp-tooltip" data-tooltip="current-mp-tooltip"><span aria-hidden="true">i</span></button>
+                    <span class="field-tooltip" id="current-mp-tooltip" role="tooltip" hidden>Base MP without equipment or buffs.</span>
+                  </div>
+                  <input id="i-cur-mp" type="number" inputmode="numeric" min="0" max="30000" step="1" value="5" aria-describedby="current-mp-tooltip" required>
                 </div>
                 </div>
               </fieldset>
@@ -1173,18 +1211,29 @@
                 <span class="field-hint" id="target-help">Both goals should be met at this level.</span>
               </div>
               <div class="field card-field" id="f-swap-level">
-                <label for="i-swap-level">Swap level</label>
-                <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" aria-describedby="swap-help" required>
-                <span class="field-hint" id="swap-help">When you move Base INT into your Main Stat to focus on combat.</span>
+                <div class="field-label">
+                  <label for="i-swap-level">Swap level</label>
+                  <button class="field-help" type="button" aria-label="About Swap level" aria-describedby="swap-tooltip" data-tooltip="swap-tooltip"><span aria-hidden="true">i</span></button>
+                  <span class="field-tooltip" id="swap-tooltip" role="tooltip" hidden>The level by which MP Washing stops and you reset Base INT to make your character playable.</span>
+                </div>
+                <input id="i-swap-level" type="number" inputmode="numeric" min="1" max="200" step="1" value="135" aria-describedby="swap-tooltip" required>
               </div>
               <div class="field card-field">
-                <label for="i-hp-goal">HP goal</label>
-                <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" required>
+                <div class="field-label">
+                  <label for="i-hp-goal">HP goal</label>
+                  <button class="field-help" type="button" aria-label="About HP goal" aria-describedby="hp-goal-tooltip" data-tooltip="hp-goal-tooltip"><span aria-hidden="true">i</span></button>
+                  <span class="field-tooltip" id="hp-goal-tooltip" role="tooltip" hidden>Base HP without equipment or buffs.</span>
+                </div>
+                <input id="i-hp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="30000" aria-describedby="hp-goal-tooltip" required>
                 <span class="clamp-note" id="i-hp-goal-clamp-note"></span>
               </div>
               <div class="field card-field">
-                <label for="i-mp-goal">MP goal</label>
-                <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" required>
+                <div class="field-label">
+                  <label for="i-mp-goal">MP goal</label>
+                  <button class="field-help" type="button" aria-label="About MP goal" aria-describedby="mp-goal-tooltip" data-tooltip="mp-goal-tooltip"><span aria-hidden="true">i</span></button>
+                  <span class="field-tooltip" id="mp-goal-tooltip" role="tooltip" hidden>Base MP without equipment or buffs.</span>
+                </div>
+                <input id="i-mp-goal" type="number" inputmode="numeric" min="0" max="30000" step="1" value="4000" aria-describedby="mp-goal-tooltip" required>
                 <span class="clamp-note" id="i-mp-goal-clamp-note"></span>
               </div>
             </div>
@@ -1576,6 +1625,46 @@
 
     [classSelect, mwSelect].forEach(enhanceSelect);
 
+    // Keep tooltips outside the wizard's clipped card, and within the viewport on mobile.
+    const helpButtons = [...document.querySelectorAll('[data-tooltip]')];
+    let tooltipHideTimer;
+    function hideTooltips() {
+      clearTimeout(tooltipHideTimer);
+      helpButtons.forEach(button => { $(button.dataset.tooltip).hidden = true; });
+    }
+    function showTooltip(button) {
+      hideTooltips();
+      const tooltip = $(button.dataset.tooltip);
+      tooltip.hidden = false;
+      const anchor = button.closest('.field-label').getBoundingClientRect();
+      const box = tooltip.getBoundingClientRect();
+      tooltip.style.left = Math.max(16, Math.min(anchor.left, innerWidth - box.width - 16)) + 'px';
+      tooltip.style.top = (anchor.top - box.height - 8 >= 16
+        ? anchor.top - box.height - 8 : Math.min(anchor.bottom + 8, innerHeight - box.height - 16)) + 'px';
+    }
+    helpButtons.forEach(button => {
+      const tooltip = $(button.dataset.tooltip);
+      const field = button.closest('.field');
+      document.body.appendChild(tooltip);
+      const scheduleHide = () => {
+        clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = setTimeout(() => {
+          if (!button.matches(':focus-visible') && !field.matches(':hover') && !tooltip.matches(':hover')) tooltip.hidden = true;
+        }, 150);
+      };
+      field.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') showTooltip(button); });
+      button.addEventListener('focus', () => { if (button.matches(':focus-visible')) showTooltip(button); });
+      button.addEventListener('click', () => showTooltip(button));
+      field.addEventListener('pointerleave', scheduleHide);
+      button.addEventListener('blur', scheduleHide);
+      tooltip.addEventListener('pointerenter', () => clearTimeout(tooltipHideTimer));
+      tooltip.addEventListener('pointerleave', scheduleHide);
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') hideTooltips(); });
+    document.addEventListener('pointerdown', event => { if (!event.target.closest('.field-help, .field-tooltip')) hideTooltips(); });
+    window.addEventListener('scroll', hideTooltips, true);
+    window.addEventListener('resize', hideTooltips);
+
     // ── Sequential wizard ──────────────────────────────────────────────────────────────────
     const wizardStages = [...document.querySelectorAll('.wizard-stage')];
     const wizardSteps = [...document.querySelectorAll('.step-item')];
@@ -1611,6 +1700,7 @@
     }
 
     function setWizardStep(nextStep, focusField = true) {
+      hideTooltips();
       currentWizardStep = Math.max(0, Math.min(wizardStages.length - 1, nextStep));
       $('wizard-step-label').textContent = `Step ${currentWizardStep + 1} of ${wizardStages.length}`;
       if (currentWizardStep === wizardStages.length - 1) updateReview();
