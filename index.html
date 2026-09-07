@@ -627,22 +627,6 @@
       line-height: 1.55;
     }
 
-    .footer {
-      margin-top: 96px;
-      padding-top: 32px;
-      border-top: 1px solid var(--line-soft);
-      font-family: 'Inter Tight', sans-serif;
-      font-weight: 400;
-      font-size: 13.5px;
-      color: var(--text-mute);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .footer a { color: var(--text-2); text-decoration: none; border-bottom: 1px dotted var(--line); }
-    .footer a:hover { color: var(--maple); border-color: var(--maple); }
-
     @media (max-width: 720px) {
       .frame { padding: 40px 20px 64px; }
       .wordmark { font-size: 36px; }
@@ -683,6 +667,9 @@
     }
 
     .site-header { display: flex; justify-content: space-between; align-items: center; gap: 28px; margin-bottom: 32px; padding-bottom: 26px; border-bottom: 1px solid var(--line-soft); }
+    .site-info { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 13px; color: var(--text-mute); text-align: right; }
+    .site-info a { color: var(--text-2); text-decoration: none; border-bottom: 1px dotted var(--line); }
+    .site-info a:hover { color: var(--maple); border-color: var(--maple); }
     .head { align-items: center; gap: 10px; margin-bottom: 4px; }
     .mark { width: 30px; height: 30px; transform: none; }
     .mark path { fill: none; stroke: var(--maple); stroke-width: 1.35; }
@@ -695,8 +682,6 @@
       margin: 0 0 0 40px;
       text-transform: none;
     }
-    .header-note { color: var(--text-2); font-size: 14px; line-height: 1.7; max-width: 260px; padding-left: 20px; border-left: 2px solid var(--line); }
-    .header-note strong { color: var(--moss); font-weight: 600; display: block; }
 
     .wizard-layout {
       display: grid;
@@ -780,7 +765,6 @@
     }
     .wizard-card form { min-height: 490px; display: flex; flex-direction: column; }
     .stage-kicker { font-size: 12px; font-weight: 600; color: var(--moss); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
-    .stage-description { color: var(--text-mute); font-size: 15px; line-height: 1.65; margin-top: 12px; max-width: 60ch; }
     .field-group { border: 0; min-width: 0; }
     .field-group legend { font-size: 14px; font-weight: 600; color: var(--text-2); margin-bottom: 16px; }
     .field-hint { font-size: 13px; color: var(--text-mute); line-height: 1.55; }
@@ -1023,8 +1007,6 @@
     .result .section-rule { background: var(--line-soft); }
     table.lt thead th { background: var(--surface-2); }
     table.lt tr:hover td { background: rgba(201, 147, 53, .06); }
-    .footer { color: var(--text-mute); margin-top: 58px; }
-    .footer a { color: var(--text-2); }
 
     @media (max-width: 980px) {
       .frame { padding-inline: 30px; }
@@ -1045,8 +1027,8 @@
 
     @media (max-width: 700px) {
       .frame { padding: 22px 14px 40px; }
-      .site-header { margin-bottom: 24px; padding: 0 4px 20px; }
-      .header-note { display: none; }
+      .site-header { margin-bottom: 24px; padding: 0 4px 20px; flex-wrap: wrap; gap: 16px; }
+      .site-info { flex: 1 0 100%; font-size: 12px; }
       .head { align-items: flex-start; gap: 9px; }
       .mark { height: 28px; margin-top: 5px; width: 28px; }
       .wordmark { font-size: 31px; }
@@ -1062,7 +1044,6 @@
       .character-grid { grid-template-columns: 1fr; gap: 24px; }
       .character-grid .field-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-group legend { margin-bottom: 12px; }
-      .stage-description { font-size: 14px; }
       .field-hint { font-size: 12px; }
       .wizard-card .field input, .listbox-button { font-size: 17px; min-height: 52px; padding: 10px 12px; }
       .listbox-option { font-size: 16px; padding: 8px 10px; }
@@ -1084,7 +1065,6 @@
       .phase-heading { flex-direction: column; gap: 8px; }
       .phase-name { font-size: 17px; }
       .notation-grid { grid-template-columns: 1fr; }
-      .footer { font-size: 12px; }
     }
     @media (max-width: 380px) {
       .goals-grid, .gear-grid { grid-template-columns: 1fr; }
@@ -1108,7 +1088,10 @@
       </div>
       <div class="meta-line">MapleLegends washing calculator</div>
       </div>
-      <p class="header-note"><strong>A clear plan for your character.</strong>See the stats, steps and AP Resets needed to reach your goals.</p>
+      <div class="site-info">
+        <span>Built on Nise &amp; Krythan's MapleLegends formulas.</span>
+        <a href="https://github.com/tablofan/MapleWasher" target="_blank" rel="noopener">github.com/tablofan/MapleWasher</a>
+      </div>
     </header>
 
     <div class="wizard-layout">
@@ -1146,8 +1129,7 @@
           <p class="stage-kicker" id="wizard-step-label">Step 1 of 4</p>
           <div class="wizard-stage active" data-stage="0">
             <h2 class="stage-heading">Your character</h2>
-            <p class="stage-description" id="character-help">Enter your character’s current stats. Starting fresh? The defaults are ready to use.</p>
-            <div class="stage-body pair-grid character-grid" aria-describedby="character-help">
+            <div class="stage-body pair-grid character-grid">
               <fieldset class="field-group">
                 <legend>Character details</legend>
                 <div class="field-stack">
@@ -1203,12 +1185,14 @@
 
           <div class="wizard-stage" data-stage="1" hidden>
             <h2 class="stage-heading">Set your goals</h2>
-            <p class="stage-description">Choose the HP and MP you want to reach, and the level you want to reach them by.</p>
             <div class="stage-body pair-grid goals-grid">
               <div class="field card-field">
-                <label for="i-target-level">Target level</label>
-                <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" aria-describedby="target-help" required>
-                <span class="field-hint" id="target-help">Both goals should be met at this level.</span>
+                <div class="field-label">
+                  <label for="i-target-level">Target level</label>
+                  <button class="field-help" type="button" aria-label="About Target level" aria-describedby="target-tooltip" data-tooltip="target-tooltip"><span aria-hidden="true">i</span></button>
+                  <span class="field-tooltip" id="target-tooltip" role="tooltip" hidden>Level at which both goals should be met</span>
+                </div>
+                <input id="i-target-level" type="number" inputmode="numeric" min="2" max="200" step="1" value="135" aria-describedby="target-tooltip" required>
               </div>
               <div class="field card-field" id="f-swap-level">
                 <div class="field-label">
@@ -1241,7 +1225,6 @@
 
           <div class="wizard-stage" data-stage="2" hidden>
             <h2 class="stage-heading">Gear &amp; buffs</h2>
-            <p class="stage-description">Extra INT helps you gain more MP as you level. Use the gear and Maple Warrior buff you expect to have.</p>
             <div class="stage-body pair-grid gear-grid">
               <div class="field card-field">
                 <label for="i-gear-int">INT Gear</label>
@@ -1259,7 +1242,6 @@
 
           <div class="wizard-stage" data-stage="3" hidden>
             <h2 class="stage-heading" tabindex="-1">Ready to calculate?</h2>
-            <p class="stage-description">Check your setup below. We’ll find a plan that meets your goals and minimises AP Resets.</p>
             <div class="stage-body review-grid" id="review-content">
               <section class="review-group">
                 <div class="review-group-head"><h3>Character</h3><button class="review-edit" type="button" data-edit-step="0" aria-label="Edit character">Edit</button></div>
@@ -1395,10 +1377,6 @@
       </div>
     </section>
 
-    <footer class="footer">
-      <span>Built on Nise &amp; Krythan's MapleLegends formulas.</span>
-      <span><a href="https://github.com/tablofan/MapleWasher" target="_blank" rel="noopener">github.com/tablofan/MapleWasher</a></span>
-    </footer>
   </main>
 
   <script src="./classes.js"></script>
