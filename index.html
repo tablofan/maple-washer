@@ -1040,12 +1040,13 @@
 
     @media (max-width: 700px) {
       .frame { padding: 22px 14px 40px; }
-      .site-header { margin-bottom: 24px; padding: 0 4px 20px; flex-wrap: wrap; gap: 16px; }
-      .site-info { flex: 1 0 100%; font-size: 12px; }
-      .head { align-items: flex-start; gap: 9px; }
-      .mark { height: 28px; margin-top: 5px; width: 28px; }
-      .wordmark { font-size: 31px; }
-      .meta-line { font-size: 13px; margin-left: 38px; }
+      .site-header { margin-bottom: 24px; padding: 0 4px 20px; align-items: flex-start; gap: 12px; }
+      .site-header > div:first-child { flex: 1; min-width: 0; }
+      .site-info { flex: none; max-width: clamp(120px, 34vw, 160px); font-size: 12px; }
+      .head { align-items: center; gap: 6px; }
+      .mark { height: 20px; width: 20px; }
+      .wordmark { font-size: clamp(20px, 5.5vw, 31px); }
+      .meta-line { font-size: 13px; margin-left: 26px; }
       .step-name { font-size: 12px; }
       .wizard-card { border-radius: 12px; min-height: 0; padding: 24px 20px; }
       .wizard-card form { min-height: 0; }
