@@ -499,7 +499,11 @@
       place-items: center;
     }
     .phase-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; padding-top: 3px; }
+    /* Reserve a fixed gutter for the level range so every phase title starts at the same x. */
+    .phase-range-col { flex: 0 0 158px; }
     .phase-range {
+      display: inline-block;
+      max-width: 100%;
       font-size: 13px;
       font-weight: 500;
       color: var(--moss);
@@ -1076,6 +1080,7 @@
       .br-number { font-size: 13px; }
       .phase { padding-left: 44px; }
       .phase-heading { flex-direction: column; gap: 8px; }
+      .phase-range-col { flex: 0 0 auto; }
       .phase-name { font-size: 17px; }
       .notation-grid { grid-template-columns: 1fr; }
     }
@@ -2129,7 +2134,7 @@
           <li class="phase">
             <span class="phase-number" aria-hidden="true">${index + 1}</span>
             <div class="phase-heading">
-              <span class="phase-range">${escapeHTML(ph.range.replace(/Lvl/g, 'Level'))}</span>
+              <span class="phase-range-col"><span class="phase-range">${escapeHTML(ph.range.replace(/Lvl/g, 'Level'))}</span></span>
               <h3 class="phase-name">${escapeHTML(ph.phase)}</h3>
             </div>
             ${actions.length > 1
