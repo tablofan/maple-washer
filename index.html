@@ -1361,7 +1361,7 @@
           <dl class="milestone-grid" id="milestone-grid"></dl>
         </div>
 
-        <details class="breakdown" id="reset-breakdown">
+        <details class="breakdown" id="reset-breakdown" open>
           <summary class="details-toggle">Where the AP Resets go</summary>
           <p class="metric-note breakdown-intro">Each AP Reset moves one AP between stats. The costs below add up to your total.</p>
           <div class="br-row breakdown-head" aria-hidden="true"><span>Purpose</span><span>AP Resets</span><span>NX</span></div>
@@ -2003,7 +2003,7 @@
       const leveltableSection = $('leveltable-section');
 
       setLevelTableOpen(true);
-      $('reset-breakdown').open = false;
+      $('reset-breakdown').open = true;
       trackCalculation(input, result);
       $('result-context').textContent = `${input.className} · Level ${input.currentState.level} → ${input.goals.targetLevel}`;
       $('result-title').textContent = result.feasible ? 'Your washing plan' : 'Let’s adjust your goals';
