@@ -561,7 +561,7 @@
     }
     table.lt {
       width: 100%;
-      min-width: 1020px;
+      min-width: 1140px;
       border-collapse: collapse;
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
@@ -1412,6 +1412,7 @@
                 <th class="actions-col transfer-col" scope="col">AP Reset transfers</th>
                 <th scope="col">AP Resets this level</th>
                 <th scope="col">Total AP Resets so far</th>
+                <th scope="col">NX so far</th>
               </tr>
             </thead>
             <tbody id="lt-body"></tbody>
@@ -1643,6 +1644,7 @@
 
     const $ = id => document.getElementById(id);
     const fmt = n => Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    const NX_PER_AP_RESET = 3100;
 
     [classSelect, mwSelect].forEach(enhanceSelect);
 
@@ -2149,6 +2151,7 @@
             ? '<div class="lt-action-note">Includes shift before levelling</div>' : ''}${renderAPActions(r.apResetTransfers)}</td>
           <td>${fmt(r.resetsThisLevel || 0)}</td>
           <td>${fmt(r.cumulativeResets)}</td>
+          <td>${fmt(r.cumulativeResets * NX_PER_AP_RESET)}</td>
         </tr>`;
       }).join('');
       $('lt-body').innerHTML = body;
