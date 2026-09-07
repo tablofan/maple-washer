@@ -1374,15 +1374,15 @@
       <h2 class="result-heading" id="leveltable-title">Check each level</h2>
       <p class="section-intro" id="leveltable-description">AP allocations and reset transfers are totals for each level; follow the step-by-step plan for their order. Highlighted rows mark a change in AP actions; the green row is your Target Level. Scroll across to see every column.</p>
 
-      <button class="leveltable-toggle" id="leveltable-toggle" type="button"
-              aria-expanded="false" aria-controls="leveltable">
+      <button class="leveltable-toggle open" id="leveltable-toggle" type="button"
+              aria-expanded="true" aria-controls="leveltable">
         <span class="triangle" aria-hidden="true">▶</span>
-        <span class="ltlabel">Show full level table</span>
+        <span class="ltlabel">Hide full level table</span>
         <span class="count" id="leveltable-count"></span>
       </button>
 
-      <div class="leveltable" id="leveltable">
-        <div class="leveltable-inner" role="region" aria-label="Level-by-level projection" tabindex="0" hidden>
+      <div class="leveltable open" id="leveltable">
+        <div class="leveltable-inner" role="region" aria-label="Level-by-level projection" tabindex="0">
           <table class="lt" id="lt-table">
             <caption>Non-INT Pool: STR, DEX and LUK AP available above their permanent minimums. Scroll across to see all columns.</caption>
             <thead>
@@ -1961,7 +1961,7 @@
       const phasesSection = $('phases-section');
       const leveltableSection = $('leveltable-section');
 
-      setLevelTableOpen(false);
+      setLevelTableOpen(true);
       $('reset-breakdown').open = false;
       $('result-context').textContent = `${input.className} · Level ${input.currentState.level} → ${input.goals.targetLevel}`;
       $('result-title').textContent = result.feasible ? 'Your washing plan' : 'Let’s adjust your goals';
