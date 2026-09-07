@@ -11,8 +11,9 @@ from the interface and exercised directly through a Node.js test suite.
 The interface guides you through your character, goals, gear and a labelled review. Results show
 projected HP/MP against your goals, the total NX and AP Reset cost, and an estimate of the time
 needed to save that NX. Key levels lead into a numbered plan; the cost breakdown, washing-term
-guide and full level table expand when you need more detail. The layout adapts to mobile, with
-keyboard navigation and support for reduced motion.
+guide and full level table expand when you need more detail. Each level lists where fresh AP go
+and the source, destination and count of its AP Resets. The layout adapts to mobile, with keyboard
+navigation and support for reduced motion.
 
 ## Engineering highlights
 

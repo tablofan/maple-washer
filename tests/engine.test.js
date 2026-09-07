@@ -1700,6 +1700,122 @@ describe('Level-table invariants across plans', () => {
   }
 });
 
+// ────────────────────────── displayed AP allocations and transfers ──────────────────────────
+
+describe('Level-table AP actions', () => {
+  const countTo = (actions, to, from = null) => actions
+    .filter(action => action.to === to && action.from === from)
+    .reduce((sum, action) => sum + action.count, 0);
+
+  test('MP Wash resets switch from INT to Main Stat partway through a level', () => {
+    const state = { level: 30, hp: 3000, mp: 3000, str: 4, dex: 25, luk: 100, baseInt: 100 };
+    const goals = { hpGoal: 3000, mpGoal: 3000, targetLevel: 32, swapLevel: 32 };
+    const result = {
+      params: { targetBaseInt: 102, mpWashStart: 30, mpWashStop: 32, phase2MPWashResets: 10 },
+      breakdown: { shift: 0, mpWash: 10, intReset: 98 },
+    };
+    const row = levelTable(CLASSES.Assassin, state, goals, 40, 1.0, result)[1];
+    assertEq(countTo(row.apAllocations, 'MP'), 5, 'all fresh AP go into MP');
+    assertEq(countTo(row.apResetTransfers, 'INT', 'MP'), 2, 'first two washes reach Target Base INT');
+    assertEq(countTo(row.apResetTransfers, 'LUK', 'MP'), 3, 'remaining washes return AP to LUK');
+  });
+
+  for (const targetLevel of [31, 32]) {
+    for (const targetBaseInt of [100, 105]) {
+      test(`Deferred swap reset goes to ${targetBaseInt === 105 ? 'INT' : 'LUK'} with Target Level ${targetLevel}`, () => {
+        const state = { level: 30, hp: 3000, mp: 3000, str: 4, dex: 25, luk: 100, baseInt: 100 };
+        const goals = { hpGoal: 3000, mpGoal: 2500, targetLevel, swapLevel: 31 };
+        const result = {
+          params: { targetBaseInt, mpWashStart: 30, mpWashStop: 31,
+            phase2MPWashResets: 5, swapBurst: 2, cleanupStaleHPWash: 3 },
+          breakdown: { shift: 0, mpWash: 5, intReset: targetBaseInt - 4 },
+        };
+        const rows = levelTable(CLASSES.Assassin, state, goals, 40, 1.0, result);
+        const swap = rows.find(row => row.level === 31);
+        assertEq(countTo(swap.apAllocations, 'MP'), 5);
+        assertEq(countTo(swap.apResetTransfers, targetBaseInt === 105 ? 'INT' : 'LUK', 'MP'), 5,
+          'all five MP-wash resets are shown, including the deferred one');
+        assertEq(countTo(swap.apResetTransfers, 'LUK', 'INT'), targetBaseInt - 4);
+        assertEq(countTo(swap.apResetTransfers, 'HP', 'MP'), targetLevel === 31 ? 5 : 2,
+          'cleanup is included at Target Level');
+        if (targetLevel === 32) assertEq(countTo(rows.at(-1).apResetTransfers, 'HP', 'MP'), 3);
+      });
+    }
+  }
+
+  test('Mixed MP and fresh HP washing shows both allocations and the full INT reset', () => {
+    const r = plan({ class: 'Fighter',
+      current: { level: 50, hp: 5000, mp: 29940, str: 100, dex: 4, luk: 4, baseInt: 100 },
+      goals: { hpGoal: 5274, mpGoal: 29950, targetLevel: 51, swapLevel: 51 } });
+    const row = levelTable(CLASSES.Fighter, r.__state, r.__goals, 40, 1.0, r).at(-1);
+    assertEq(countTo(row.apAllocations, 'MP'), 1);
+    assertEq(countTo(row.apAllocations, 'HP'), 4);
+    assertEq(countTo(row.apResetTransfers, 'STR', 'MP'), 5);
+    assertEq(countTo(row.apResetTransfers, 'STR', 'INT'), 96);
+  });
+
+  test('Advancement AP and leftover AP are assigned separately from fresh-wash resets', () => {
+    const r = plan({ class: 'Fighter',
+      current: { level: 69, hp: 5000, mp: 1000, str: 100, dex: 4, luk: 4, baseInt: 4 },
+      goals: { hpGoal: 5704, mpGoal: 900, targetLevel: 71, swapLevel: 69 } });
+    const rows = levelTable(CLASSES.Fighter, r.__state, r.__goals, 40, 1.0, r);
+    const advancement = rows.find(row => row.level === 70);
+    const last = rows.at(-1);
+    assertEq(countTo(advancement.apAllocations, 'HP'), 10, 'all ten advancement AP wash');
+    assertEq(countTo(advancement.apResetTransfers, 'STR', 'MP'), 10);
+    assertEq(countTo(last.apAllocations, 'HP'), 1);
+    assertEq(countTo(last.apAllocations, 'STR'), 4, 'unused fresh AP go directly to STR');
+    assertEq(countTo(last.apResetTransfers, 'STR', 'MP'), 1, 'only the HP allocation needs a reset');
+  });
+
+  test('The initial shift is shown and counted on the starting row', () => {
+    const state = { level: 100, hp: 6000, mp: 3000, str: 60, dex: 120, luk: 400, baseInt: 13 };
+    const goals = { hpGoal: 16000, mpGoal: 8000, targetLevel: 135, swapLevel: 135 };
+    const r = plan({ class: 'Assassin', current: state, goals });
+    const row = levelTable(CLASSES.Assassin, r.__state, r.__goals, 40, 1.0, r)[0];
+    assertTrue(r.breakdown.shift > 0);
+    assertEq(row.apAllocations.length, 0, 'no new AP are assumed at the current level');
+    assertEq(countTo(row.apResetTransfers, 'INT', 'Non-INT'), r.breakdown.shift);
+    assertEq(row.resetsThisLevel, r.breakdown.shift);
+    assertEq(row.cumulativeResets, r.breakdown.shift);
+  });
+
+  test('Displayed actions conserve AP and reconcile INT, the Non-INT pool, and every reset across all fixtures', () => {
+    const seenClasses = new Set();
+    for (const [key, r] of planCache) {
+      if (!r.feasible) continue;
+      const [className, state, goals, gearInt, mwMultiplier] = JSON.parse(key);
+      const cd = CLASSES[className];
+      const rows = levelTable(cd, state, goals, gearInt, mwMultiplier, r);
+      seenClasses.add(className);
+      let baseInt = state.baseInt;
+      let pool = nonIntPool(cd, state);
+      let totalResets = 0;
+      for (const row of rows) {
+        const label = `${className} lvl ${row.level}`;
+        const allocated = row.apAllocations.reduce((sum, action) => sum + action.count, 0);
+        assertEq(allocated, row.level === state.level ? 0 : mod.freshAPAtLevel(cd, row.level), `${label}: fresh AP conserved`);
+        const resets = row.apResetTransfers.reduce((sum, action) => sum + action.count, 0);
+        assertEq(resets, row.resetsThisLevel, `${label}: transfers match reset count`);
+        totalResets += resets;
+        assertEq(totalResets, row.cumulativeResets, `${label}: running total matches transfers`);
+        for (const action of [...row.apAllocations, ...row.apResetTransfers]) {
+          assertTrue(Number.isInteger(action.count) && action.count > 0, `${label}: positive whole AP counts`);
+          if (action.to === 'INT') baseInt += action.count;
+          if (action.from === 'INT') baseInt -= action.count;
+          if (['STR', 'DEX', 'LUK'].includes(action.to)) pool += action.count;
+          if (action.from === 'Non-INT') pool -= action.count;
+        }
+        if (cd.firstJobRequirement && cd.firstJobRequirement.stat !== 'INT') pool -= row.firstJobAPThisLevel;
+        assertEq(baseInt, row.baseInt, `${label}: transfers reproduce Base INT`);
+        assertEq(pool, row.nonIntPool, `${label}: transfers reproduce the Non-INT pool`);
+      }
+      assertEq(totalResets, r.apResets, `${className}: all planned AP Resets are displayed`);
+    }
+    assertEq(seenClasses.size, CLASS_ORDER.length, 'every class is checked');
+  });
+});
+
 // ────────────────────────── exit ──────────────────────────
 
 console.log('\n──────────────');

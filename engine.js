@@ -1894,6 +1894,15 @@ function phasePlan(classData, currentState, goals, result) {
   return phases;
 }
 
+// Group the actual allocations/transfers for display. These are per-level totals, not an
+// execution order: a wash may need its paired reset deferred to keep the HP/MP Pool available.
+function recordAPAction(actions, count, from, to) {
+  if (count <= 0) return;
+  const existing = actions.find(action => action.from === from && action.to === to);
+  if (existing) existing.count += count;
+  else actions.push({ count, from, to });
+}
+
 // Generate a level-by-level table. Mirrors the analytical engine's math by sharing the same
 // wash-math primitives (washCycleMP, intMPPerLevel, freshHPWashYield, staleHPWashYield,
 // washCycleMPCost). Each per-level value is computed with the same formula evaluateStrategy
@@ -1924,7 +1933,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
   const basePool = Math.max(0, nonIntPool(classData, currentState) - signedShift);
   const mainStatFloor = nonIntStatFloor(classData, classData.mainStat);
   const mainStatMovableAtStart = Math.max(0, mainStat - mainStatFloor);
-  let cumulativeResets = result.breakdown.shift;  // pre-game shift counted at level 0
+  let cumulativeResets = 0;  // The initial row includes any shift before levelling.
   let phase2MPRemaining = p.phase2MPWashResets ?? result.breakdown.mpWash;
   let preSwapFreshRemaining = p.preSwapFreshHPResets || 0;
   let phase3FreshRemaining = p.phase3FreshHPResets || 0;
@@ -1934,7 +1943,15 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
   let hpMPPoolSeeded = false;
 
   for (let L = currentState.level; L <= goals.targetLevel; L++) {
-    let resetsThisLevel = 0;
+    const apAllocations = [];
+    const apResetTransfers = [];
+    const shiftThisLevel = L === currentState.level ? result.breakdown.shift : 0;
+    let resetsThisLevel = shiftThisLevel;
+    if (shiftThisLevel > 0) {
+      recordAPAction(apResetTransfers, shiftThisLevel,
+        result.breakdown.shiftDir === 'down' ? 'INT' : 'Non-INT',
+        result.breakdown.shiftDir === 'down' ? classData.mainStat : 'INT');
+    }
     let mpResetsThisLevel = 0;
     let freshHPWashesThisLevel = 0;
     let staleHPWashesThisLevel = 0;
@@ -1950,6 +1967,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
 
     if (firstJobRequirement && firstJobRequirement.stat !== 'INT'
         && firstJobAPThisLevel > 0) {
+      recordAPAction(apAllocations, firstJobAPThisLevel, null, firstJobRequirement.stat);
       firstJobStatValue += firstJobAPThisLevel;
       if (firstJobRequirement.stat === classData.mainStat) {
         mainStat += firstJobAPThisLevel;
@@ -1981,6 +1999,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         const freshToInt = classData.isMage
           ? freshAP
           : Math.min(freshAP, Math.max(0, p.targetBaseInt - baseInt));
+        recordAPAction(apAllocations, freshToInt, null, 'INT');
+        recordAPAction(apAllocations, freshAP - freshToInt, null, classData.mainStat);
         baseInt += freshToInt;
         mainStat += freshAP - freshToInt;
         phase = freshToInt > 0 ? 'Build Base INT' : `Build ${classData.mainStat}`;
@@ -1996,6 +2016,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           mp += gross;
           peakMPThisLevel = Math.max(peakMPThisLevel, mp);
           mp -= classData.mpLossPerReset;
+          recordAPAction(apResetTransfers, 1, 'MP',
+            baseInt < p.targetBaseInt || classData.isMage ? 'INT' : classData.mainStat);
           if (baseInt < p.targetBaseInt || classData.isMage) baseInt++;
           else mainStat++;
         }
@@ -2010,6 +2032,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         freshHPWashesThisLevel = freshHPWashes;
 
         const directToMainStat = freshAP - mpWashes - freshHPWashes;
+        recordAPAction(apAllocations, directToMainStat, null, classData.mainStat);
         if (classData.isMage) baseInt += directToMainStat;
         else mainStat += directToMainStat;
         resetsThisLevel = mpWashes + freshHPWashes;
@@ -2047,6 +2070,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
             pendingMPResetToInt = baseInt < p.targetBaseInt;
           } else {
             mp -= classData.mpLossPerReset;
+            recordAPAction(apResetTransfers, 1, 'MP', baseInt < p.targetBaseInt ? 'INT' : classData.mainStat);
             if (baseInt < p.targetBaseInt) baseInt++;
             else mainStat++;
           }
@@ -2061,6 +2085,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
 
         const unallocatedFresh = freshAP - swapMPWashes - swapFresh;
         const freshToInt = Math.min(unallocatedFresh, Math.max(0, p.targetBaseInt - baseInt));
+        recordAPAction(apAllocations, freshToInt, null, 'INT');
+        recordAPAction(apAllocations, unallocatedFresh - freshToInt, null, classData.mainStat);
         baseInt += freshToInt;
         mainStat += unallocatedFresh - freshToInt;
         resetsThisLevel = swapMPWashes + swapFresh;
@@ -2074,6 +2100,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       }
       if (pendingMPResetToInt || (burst > 0 && swapMPWashes > 0 && swapFresh === 0)) {
         mp -= classData.mpLossPerReset;
+        recordAPAction(apResetTransfers, 1, 'MP', pendingMPResetToInt ? 'INT' : classData.mainStat);
         if (pendingMPResetToInt) baseInt++;
         else mainStat++;
       }
@@ -2081,6 +2108,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       mainStat += pendingFreshResets;
       peakMPThisLevel = Math.max(peakMPThisLevel, mp);
       mainStat += intResets;
+      recordAPAction(apResetTransfers, intResets, 'INT', classData.mainStat);
       baseInt = classData.requiresIntResetAtTarget ? STARTING_MAIN_STAT : baseInt;
       resetsThisLevel += burst + intResets;
       mpResetsThisLevel += burst;
@@ -2112,6 +2140,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         }
         hpMPPoolSeeded = hpMPPoolSeeded || freshAP > 0;
         mpWashesThisLevel = freshAP;
+        recordAPAction(apResetTransfers, freshAP, 'MP', 'INT');
         if (mp > goals.mpGoal) {
           const washes = Math.floor((mp - goals.mpGoal) / classData.mpLossPerReset);
           hp = Math.min(MAX_HP, hp + staleHPWashYield(classData, washes));
@@ -2146,6 +2175,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           // `fresh` AP went to HP; the rest of the level's AP goes to Main Stat. The `fresh`
           // -MP +MainStat resets are the pair described in CONTEXT.md (Post-Swap Fresh HP Wash).
           mainStat += freshAP;
+          recordAPAction(apAllocations, freshAP - fresh, null, classData.mainStat);
           mp -= washCycleMPCost(classData, fresh + stale);
           resetsThisLevel = fresh + stale;
           mpResetsThisLevel = fresh + stale;
@@ -2154,6 +2184,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       } else {
         phase = `Build ${classData.mainStat}`;
         mainStat += freshAP;
+        recordAPAction(apAllocations, freshAP, null, classData.mainStat);
       }
     } else if (p.capWash) {
       // Target level under cap-wash: keep its fresh AP in INT and convert the net MP inflow to HP.
@@ -2170,6 +2201,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         }
         hpMPPoolSeeded = hpMPPoolSeeded || freshAP > 0;
         mpWashesThisLevel = freshAP;
+        recordAPAction(apResetTransfers, freshAP, 'MP', 'INT');
         if (mp > goals.mpGoal) {
           const washes = Math.floor((mp - goals.mpGoal) / classData.mpLossPerReset);
           hp = Math.min(MAX_HP, hp + staleHPWashYield(classData, washes));
@@ -2219,6 +2251,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
           phase = `Build ${classData.mainStat}`;
         }
         mainStat += freshAP;
+        recordAPAction(apAllocations, freshAP - freshHPWashesThisLevel, null, classData.mainStat);
       }
       let swapFresh = 0;
       let swapMPWashes = 0;
@@ -2239,6 +2272,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
             pendingSwapMPResetDestination = baseInt < p.targetBaseInt ? 'INT' : 'main';
           } else {
             mp -= classData.mpLossPerReset;
+            recordAPAction(apResetTransfers, 1, 'MP', baseInt < p.targetBaseInt ? 'INT' : classData.mainStat);
             if (baseInt < p.targetBaseInt) baseInt++;
             else mainStat++;
           }
@@ -2253,6 +2287,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
 
         const unallocatedFresh = freshAP - swapMPWashes - swapFresh;
         const freshToInt = Math.min(unallocatedFresh, Math.max(0, p.targetBaseInt - baseInt));
+        recordAPAction(apAllocations, freshToInt, null, 'INT');
+        recordAPAction(apAllocations, unallocatedFresh - freshToInt, null, classData.mainStat);
         baseInt += freshToInt;
         mainStat += unallocatedFresh - freshToInt;
         resetsThisLevel += swapMPWashes + swapFresh;
@@ -2277,6 +2313,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       // Reclaim the fresh AP only after every stale wash; this keeps the shared HP/MP Pool non-empty.
       if (pendingSwapMPResetDestination !== null) {
         mp -= classData.mpLossPerReset;
+        recordAPAction(apResetTransfers, 1, 'MP', pendingSwapMPResetDestination === 'INT' ? 'INT' : classData.mainStat);
         if (pendingSwapMPResetDestination === 'INT') baseInt++;
         else mainStat++;
       }
@@ -2284,6 +2321,7 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       mainStat += pendingSwapFreshResets;
       peakMPThisLevel = Math.max(peakMPThisLevel, mp);
       mainStat += intResetsHere;
+      recordAPAction(apResetTransfers, intResetsHere, 'INT', classData.mainStat);
       if (swapHere) baseInt = classData.requiresIntResetAtTarget ? STARTING_MAIN_STAT : baseInt;
       resetsThisLevel += burstHere + intResetsHere;
       mpResetsThisLevel += burstHere;
@@ -2312,6 +2350,10 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
       phase = phase ? `${jobLabel} + ${phase}` : jobLabel;
     }
     const hpMPPoolValid = staleHPWashesThisLevel === 0 || hpMPPoolSeeded;
+    recordAPAction(apAllocations, mpWashesThisLevel, null, 'MP');
+    recordAPAction(apAllocations, freshHPWashesThisLevel, null, 'HP');
+    recordAPAction(apResetTransfers, freshHPWashesThisLevel, 'MP', classData.mainStat);
+    recordAPAction(apResetTransfers, staleHPWashesThisLevel, 'MP', 'HP');
     cumulativeResets += resetsThisLevel;
 
     rows.push({
@@ -2331,6 +2373,8 @@ function levelTable(classData, currentState, goals, gearInt, mwMultiplier, resul
         : null,
       firstJobAPThisLevel,
       phase,
+      apAllocations,
+      apResetTransfers,
       freshHPWashesThisLevel,
       staleHPWashesThisLevel,
       mpWashesThisLevel,

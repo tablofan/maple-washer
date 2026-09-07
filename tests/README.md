@@ -39,6 +39,10 @@ assert different facets of one fixture pay for it once.
 - **Phase plan and level table shape** — phase ordering and vocabulary, the
   Base-INT collapse at the Swap Level, per-level AP splits, and the Non-INT pool
   column.
+- **Displayed AP actions** — fresh allocations and reset directions, split MP-wash
+  destinations, deferred swap resets, advancement AP, and the upfront shift.
+  Across all feasible fixtures, actions conserve AP, reproduce Base INT and the
+  Non-INT pool, and reconcile each row's reset count with the plan total.
 - **Input preparation and worker wiring** — `prepareInputs` clamping and its
   notes, plus `wash-worker.js` driven in a `vm` against a stub `optimize`.
 

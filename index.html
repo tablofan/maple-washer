@@ -561,7 +561,7 @@
     }
     table.lt {
       width: 100%;
-      min-width: 860px;
+      min-width: 1020px;
       border-collapse: collapse;
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
@@ -581,7 +581,7 @@
       border-bottom: 1px solid var(--line);
     }
     table.lt thead th:first-child,
-    table.lt thead th.phase-col { text-align: left; }
+    table.lt thead th.actions-col { text-align: left; }
     table.lt thead th { z-index: 1; }
     table.lt th:first-child, table.lt td:first-child { position: sticky; left: 0; background: var(--surface); }
     table.lt thead th:first-child { z-index: 2; background: var(--surface-2); }
@@ -589,19 +589,26 @@
     table.lt td {
       padding: 8px 14px;
       text-align: right;
+      vertical-align: top;
       color: var(--text);
       border-bottom: 1px solid var(--line-soft);
     }
     table.lt td:first-child { text-align: left; color: var(--text-2); }
-    table.lt td.phase-col {
+    table.lt td.actions-col {
       text-align: left;
       font-family: 'Inter Tight', sans-serif;
       font-weight: 400;
-      font-size: 12.5px;
+      font-size: 13px;
       color: var(--text-2);
     }
+    table.lt .allocation-col { min-width: 145px; }
+    table.lt .transfer-col { min-width: 185px; }
+    .lt-actions { list-style: none; display: grid; gap: 4px; }
+    .lt-actions li { white-space: nowrap; }
+    .lt-action-note, .lt-no-action { color: var(--text-mute); font-size: 12px; font-weight: 400; }
+    .lt-action-note { margin-bottom: 4px; }
     table.lt tr.boundary td { color: var(--maple); border-bottom-color: var(--maple-glow); }
-    table.lt tr.boundary td.phase-col { color: var(--maple); font-weight: 500; }
+    table.lt tr.boundary td.actions-col { color: var(--maple); font-weight: 500; }
     table.lt tr.target-row td { background: #edf3e9; color: var(--moss); font-weight: 600; }
     table.lt tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
@@ -1346,7 +1353,7 @@
 
     <section class="section result" id="leveltable-section" aria-labelledby="leveltable-title">
       <h2 class="result-heading" id="leveltable-title">Check each level</h2>
-      <p class="section-intro" id="leveltable-description">Your projected stats and AP Reset count after each level’s actions. Highlighted rows mark a phase change; the green row is your Target Level. Scroll across to see every column.</p>
+      <p class="section-intro" id="leveltable-description">AP allocations and reset transfers are totals for each level; follow the step-by-step plan for their order. Highlighted rows mark a change in AP actions; the green row is your Target Level. Scroll across to see every column.</p>
 
       <button class="leveltable-toggle" id="leveltable-toggle" type="button"
               aria-expanded="false" aria-controls="leveltable">
@@ -1366,7 +1373,8 @@
                 <th scope="col">MP</th>
                 <th scope="col">Base INT</th>
                 <th scope="col">non-int pool</th>
-                <th class="phase-col" scope="col">phase</th>
+                <th class="actions-col allocation-col" scope="col">Fresh AP allocations</th>
+                <th class="actions-col transfer-col" scope="col">AP Reset transfers</th>
                 <th scope="col">AP Resets this level</th>
                 <th scope="col">Total AP Resets so far</th>
               </tr>
@@ -1911,6 +1919,13 @@
       })[char]);
     }
 
+    function renderAPActions(actions) {
+      if (actions.length === 0) return '<span class="lt-no-action">None</span>';
+      return `<ul class="lt-actions">${actions.map(action => `<li>${action.from === null
+        ? `${fmt(action.count)} AP → ${escapeHTML(action.to)}`
+        : `${fmt(action.count)} × ${escapeHTML(action.from)} → ${escapeHTML(action.to)}`}</li>`).join('')}</ul>`;
+    }
+
     const opLabels = {
       // Shift source is the non-INT pool (player picks the stat); literal — no STAT substitution.
       shift_up:   { op: '-Non-INT +INT', label: 'Move existing stats into INT' },
@@ -2058,21 +2073,20 @@
 
       const rows = levelTable(input.classData, input.currentState, input.goals, input.gearInt, input.mwMultiplier, result);
       $('leveltable-count').textContent = `${rows.length} ${rows.length === 1 ? 'level' : 'levels'}`;
-      const phaseChangedSet = new Set();
-      let prevPhase = null;
-      rows.forEach(r => {
-        if (r.phase !== prevPhase) phaseChangedSet.add(r.level);
-        prevPhase = r.phase;
-      });
+      let previousActions = null;
       const body = rows.map(r => {
-        const boundary = [phaseChangedSet.has(r.level) ? 'boundary' : '', r.level === input.goals.targetLevel ? 'target-row' : ''].join(' ');
+        const actions = JSON.stringify([r.apAllocations, r.apResetTransfers]);
+        const boundary = [actions !== previousActions ? 'boundary' : '', r.level === input.goals.targetLevel ? 'target-row' : ''].join(' ');
+        previousActions = actions;
         return `<tr class="${boundary}">
           <td>${r.level}</td>
           <td>${fmt(r.hp)}</td>
           <td>${fmt(r.mp)}</td>
           <td>${fmt(r.baseInt)}</td>
           <td>${fmt(r.nonIntPool)}</td>
-          <td class="phase-col">${r.phase}</td>
+          <td class="actions-col allocation-col">${renderAPActions(r.apAllocations)}</td>
+          <td class="actions-col transfer-col">${r.level === input.currentState.level && result.breakdown.shift > 0
+            ? '<div class="lt-action-note">Includes shift before levelling</div>' : ''}${renderAPActions(r.apResetTransfers)}</td>
           <td>${fmt(r.resetsThisLevel || 0)}</td>
           <td>${fmt(r.cumulativeResets)}</td>
         </tr>`;
