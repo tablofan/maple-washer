@@ -1087,6 +1087,16 @@
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
+
+  <!-- PostHog: only the coarse properties listed in trackCalculation — no raw stats leave the browser. -->
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],Object.defineProperty(u,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e}}),Object.defineProperty(u.people,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(){return u.toString(1)+".people (stub)"}}),o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_D7W4gx2yUVELDoHzuSJRvaEHqHeJhT4fCFYNWmQCAK8C', {
+      api_host: 'https://us.i.posthog.com',
+      defaults: '2026-05-30',
+      person_profiles: 'identified_only',
+    });
+  </script>
 </head>
 <body>
   <main class="frame">
@@ -1962,6 +1972,30 @@
       staleHPWash:{ op: '-MP +HP', label: 'Stale HP Wash' },
     };
 
+    // Deliberately coarse: class, rounded levels and a reset-count band. No HP/MP/INT/stats or
+    // other exact inputs are sent, so a plan can't be traced back to a build.
+    function trackCalculation(input, result) {
+      const posthog = window.posthog;
+      if (typeof posthog?.capture !== 'function') return;
+      const nearestTen = level => Math.round(level / 10) * 10;
+      const resets = result.apResets;
+      const props = {
+        character_class: input.className,
+        is_mage: input.classData.isMage,
+        feasible: result.feasible,
+        current_level: nearestTen(input.currentState.level),
+        target_level: nearestTen(input.goals.targetLevel),
+      };
+      if (result.feasible) {
+        props.ap_resets = resets === 0 ? '0'
+          : resets <= 100 ? '1-100'
+          : resets <= 500 ? '101-500'
+          : resets <= 1000 ? '501-1k'
+          : resets <= 5000 ? '1k-5k' : '5k+';
+      }
+      posthog.capture('plan_calculated', props);
+    }
+
     function renderResult(input, result) {
       const resultSection = $('result');
       const phasesSection = $('phases-section');
@@ -1969,6 +2003,7 @@
 
       setLevelTableOpen(true);
       $('reset-breakdown').open = false;
+      trackCalculation(input, result);
       $('result-context').textContent = `${input.className} · Level ${input.currentState.level} → ${input.goals.targetLevel}`;
       $('result-title').textContent = result.feasible ? 'Your washing plan' : 'Let’s adjust your goals';
 
