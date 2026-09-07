@@ -831,6 +831,11 @@
 
     .wizard-card .field { border: 0; display: flex; padding: 0; }
     .wizard-card .field[hidden] { display: none !important; }
+    /* Keep the goals in place while the Mage's swap controls remain hidden. */
+    .wizard-card #f-swap-level[hidden] { display: flex !important; visibility: hidden; }
+    /* Reserve the help button's height even for labels without a tooltip. */
+    .wizard-card .field > label,
+    .wizard-card .field > .field-label { display: flex; align-items: center; min-height: 28px; }
     .wizard-card .field label {
       color: var(--text);
       font-size: 14px;
@@ -2320,8 +2325,8 @@
       const swapInput = $('i-swap-level');
       swapField.hidden = isMage;
       swapField.setAttribute('aria-hidden', String(isMage));
-      // Hidden alone removes the field visually; disabled also removes it from keyboard/form
-      // interaction so Magicians genuinely have no Swap Level option.
+      // CSS preserves the hidden field's space; disabled also excludes its input from
+      // form validation and submission for Magicians.
       swapInput.disabled = isMage;
       $('step-class-detail').textContent = currentWizardStep > 0 ? classSelect.value : 'Step 1 of 4';
       if (currentWizardStep === wizardStages.length - 1) updateReview();
